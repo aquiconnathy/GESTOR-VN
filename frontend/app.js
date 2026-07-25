@@ -273,6 +273,18 @@ function filtrarVentas() {
   renderTablaVentas(filtradas);
 }
 
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(900, ctx.currentTime);
+    osc.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.12);
+  } catch(e) {}
+}
+
 // ================= SCANNER =================
 function toggleScanner() {
   const reader = document.getElementById('reader');
@@ -280,21 +292,47 @@ function toggleScanner() {
     html5QrCode.stop().then(() => { html5QrCode = null; reader.innerHTML = ''; });
     return;
   }
+
+  const formatsToSupport = window.Html5QrcodeSupportedFormats ? [
+    Html5QrcodeSupportedFormats.CODE_128,
+    Html5QrcodeSupportedFormats.CODE_39,
+    Html5QrcodeSupportedFormats.EAN_13,
+    Html5QrcodeSupportedFormats.QR_CODE
+  ] : undefined;
+
   html5QrCode = new Html5Qrcode("reader");
+
+  const config = {
+    fps: 15,
+    qrbox: { width: 280, height: 75 } // Enfoque horizontal estrecho para aislar el código PON S/N entre varios verticales
+  };
+  if (formatsToSupport) config.formatsToSupport = formatsToSupport;
+
   html5QrCode.start(
     { facingMode: "environment" },
-    { fps: 10, qrbox: { width: 250, height: 150 } },
+    config,
     (decodedText) => {
-      const serial = decodedText.trim().toUpperCase();
-      if (/^VSOL[0-9A-F]{8}$/.test(serial) && !scanned.includes(serial)) {
+      let raw = decodedText.trim().toUpperCase();
+      
+      // Buscar patrón PON S/N de VSOL (ej: VSOL00E3E501) o cualquier serial de 8 a 16 caracteres
+      let serial = null;
+      const vsolMatch = raw.match(/VSOL[0-9A-Z]{8}/);
+      if (vsolMatch) {
+        serial = vsolMatch[0];
+      } else if (/^[0-9A-Z]{8,16}$/.test(raw)) {
+        serial = raw;
+      }
+
+      if (serial && !scanned.includes(serial)) {
         scanned.push(serial);
+        playBeep();
         document.getElementById('scannedList').value = scanned.map(s => s + ',AX30-H').join('\n');
         document.getElementById('scanCount').textContent = scanned.length;
-        toast('Serial agregado: ' + serial);
+        toast('📷 Serial PON detectado: ' + serial);
       }
     },
     (err) => {}
-  ).catch(err => toast('Error cámara: ' + err, 'error'));
+  ).catch(err => toast('Error al iniciar cámara: ' + err, 'error'));
 }
 
 // ================= RECEPCIÓN =================
