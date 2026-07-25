@@ -132,13 +132,11 @@ async def crear_usuario(data: CrearUsuarioIn, db: AsyncSession = Depends(get_db)
     if res_check.fetchone():
         raise HTTPException(status_code=400, detail="El correo ya se encuentra registrado")
     
-    stmt_count = text("SELECT COUNT(*) FROM usuarios")
-    res_count = await db.execute(stmt_count)
-    cnt = (res_count.scalar() or 0) + 1
-    new_id = f"user_{cnt}"
+    import uuid
+    new_id = str(uuid.uuid4())
     
     try:
-        stmt_ins = text("INSERT INTO usuarios (id, nombre, email, password_hash, rol, activo) VALUES (:id, :nombre, :email, :pwd, :rol, true)")
+        stmt_ins = text("INSERT INTO usuarios (id, nombre, email, password_hash, rol, activo) VALUES (CAST(:id AS UUID), :nombre, :email, :pwd, :rol, true)")
         await db.execute(stmt_ins, {
             "id": new_id,
             "nombre": data.nombre.strip(),
