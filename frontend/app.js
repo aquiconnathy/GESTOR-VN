@@ -1,5 +1,5 @@
 // ================= CONFIGURACIÓN =================
-const API_URL = 'gestor-vn-production.up.railway.app'; // ← CAMBIA ESTO por tu URL
+const API_URL = 'https://gestor-vn-production.up.railway.app''; // ← CAMBIA ESTO por tu URL
 let html5QrCode = null;
 let scanned = [];
 
