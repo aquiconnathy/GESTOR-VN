@@ -153,14 +153,23 @@
       <section id="view-recepcion" class="view">
         <div class="card">
           <h2>📥 Recepción de Equipos (Escaneo masivo)</h2>
+          
+          <div id="scanStatus" style="font-size:.85rem; text-align:center; color:var(--accent); margin-bottom:.5rem; min-height:1.2rem"></div>
+
           <div class="scanner-box" id="reader"></div>
-          <button class="btn" onclick="toggleScanner()">📷 Escanear Serial PON</button>
-          <label>Seriales escaneados (<span id="scanCount">0</span>)</label>
-          <textarea id="scannedList" rows="4" placeholder="VSOL12345678,AX30-H..."></textarea>
+          
+          <div class="grid-2" style="margin:.5rem 0">
+            <button type="button" class="btn" onclick="toggleScanner()">📷 Cámara en Vivo</button>
+            <button type="button" class="btn" onclick="document.getElementById('fileScanInput').click()">📸 Tomar Foto de Etiqueta</button>
+          </div>
+          <input type="file" id="fileScanInput" accept="image/*" capture="environment" style="display:none" onchange="handleFileScan(event)">
+
+          <label style="margin-top:.8rem">Seriales Escaneados (<span id="scanCount">0</span>)</label>
+          <textarea id="scannedList" rows="4" placeholder="VSOL00E3E501,AX30-H..."></textarea>
           <label>Entrega</label><input type="text" id="recEntrega" placeholder="Nombre quien entrega">
           <label>Recibe</label><input type="text" id="recRecibe" placeholder="Nombre quien recibe">
           <label>Observaciones</label><input type="text" id="recObs" placeholder="Opcional">
-          <button class="btn success" onclick="enviarRecepcion()">Guardar Recepción</button>
+          <button type="button" class="btn success" onclick="enviarRecepcion()">💾 Guardar Recepción</button>
         </div>
       </section>
 
