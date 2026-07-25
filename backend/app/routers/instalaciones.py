@@ -108,6 +108,13 @@ async def configurar(data: ConfiguracionIn, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Instalación no encontrada")
 
     inst.status = "CONFIGURADO"
+    if data.nombre_cliente: inst.nombre_cliente = data.nombre_cliente
+    if data.cedula_rif: inst.cedula_rif = data.cedula_rif
+    if data.nro_contacto: inst.nro_contacto = data.nro_contacto
+    if data.direccion_exacta: inst.direccion_exacta = data.direccion_exacta
+    if data.nodo: inst.nodo = data.nodo
+    if data.plan_servicio: inst.plan_servicio = data.plan_servicio
+    if data.promocion: inst.promocion = data.promocion
     if data.serial_onu: inst.serial_onu = data.serial_onu
     if data.pppoe: inst.pppoe = data.pppoe
     if data.modelo: inst.modelo = data.modelo

@@ -119,19 +119,40 @@
                     <option value="E">E-</option>
                     <option value="G">G-</option>
                   </select>
-                  <input type="text" id="vtaCedula" placeholder="12345678" required style="flex:1">
+                  <input type="text" id="vtaCedula" placeholder="12345678" required style="flex:1" oninput="calcularPppoePreviewVenta()">
                 </div>
               </div>
             </div>
 
-            <div class="grid-2">
+            <div class="grid-3">
               <div>
                 <label>Teléfono de Contacto *</label>
                 <input type="tel" id="vtaContacto" placeholder="04141234567" required>
               </div>
               <div>
+                <label>N° Servicio *</label>
+                <input type="number" id="vtaNumServicio" value="1" min="1" max="99" oninput="calcularPppoePreviewVenta()" style="font-weight:700">
+              </div>
+              <div>
+                <label style="color:var(--accent); font-weight:700">PPPoE Sugerido</label>
+                <input type="text" id="vtaPppoePreview" readonly placeholder="VN12345678-1" style="background:#0f172a; color:var(--accent); font-weight:700">
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div>
                 <label>Correo Electrónico</label>
                 <input type="email" id="vtaCorreo" placeholder="cliente@correo.com">
+              </div>
+              <div>
+                <label>Nodo</label>
+                <select id="vtaNodo">
+                  <option value="CENTRO">NODO CENTRO</option>
+                  <option value="NORTE">NODO NORTE</option>
+                  <option value="SUR">NODO SUR</option>
+                  <option value="ESTE">NODO ESTE</option>
+                  <option value="OESTE">NODO OESTE</option>
+                </select>
               </div>
             </div>
 
@@ -241,48 +262,137 @@
         </div>
       </section>
 
-      <!-- INSTALACIONES -->
-      <section id="view-instalaciones" class="view">
-        <div class="card">
-          <h2>📋 Instalaciones Pendientes y En Ruta</h2>
-          <button class="btn" onclick="cargarPendientes()">🔄 Actualizar Lista</button>
-          <div id="listaPendientes" style="margin-top:1rem; overflow-x:auto"></div>
-        </div>
-      </section>
-
-      <!-- DESPACHO -->
-      <section id="view-despacho" class="view">
-        <div class="card">
-          <h2>🚚 Despacho de Equipos a Ruta</h2>
-          <label>IDs de Instalación (separados por coma)</label>
-          <textarea id="despIds" rows="3" placeholder="INS_001, INS_002..."></textarea>
-          <label>Técnico / Instalador Asignado</label><input type="text" id="despInstalador" placeholder="Nombre del técnico">
-          <button class="btn success" onclick="enviarDespacho()">Despachar Equipos</button>
-        </div>
-      </section>
-
-      <!-- CONFIGURACIÓN DE ONU/ROUTER -->
+      <!-- CONFIGURACIÓN DE EQUIPOS (Técnico de Configuración) -->
       <section id="view-config" class="view">
         <div class="card">
           <h2>⚙️ Configurar Equipo para Instalación</h2>
-          <label>ID Instalación *</label><input type="text" id="cfgId" placeholder="INS_001">
-          <label>Serial ONU *</label><input type="text" id="cfgSerial" placeholder="VSOL12345678">
-          <label>PPPoE *</label><input type="text" id="cfgPppoe" placeholder="usuario@ejemplo">
-          <label>Modelo *</label>
-          <select id="cfgModelo">
-            <option value="">Seleccionar...</option>
-            <option value="AX30-H">AX30-H</option>
-            <option value="V2801S-B">V2801S-B</option>
-            <option value="AC1200">AC1200</option>
+          
+          <label style="color:var(--accent); font-weight:700">1. Seleccionar Instalación Pendiente de Asignar *</label>
+          <select id="cfgInstSelect" onchange="handleSelectInstalacionConfig(this)" style="font-size:1rem; border-color:var(--accent); margin-bottom:1rem">
+            <option value="">Cargando pendientes...</option>
           </select>
-          <label>Configurado Por</label><input type="text" id="cfgPor" placeholder="Técnico configurador">
-          <button class="btn success" onclick="enviarConfig()">Guardar Configuración</button>
-        </div>
 
+          <!-- FORMULARIO DE CONFIGURACIÓN Y CLIENTE -->
+          <form onsubmit="handleGuardarConfig(event)">
+            <input type="hidden" id="cfgId">
+
+            <div style="background:#182232; padding:.8rem; border-radius:.5rem; margin-bottom:1rem; border:1px solid #334155">
+              <span style="font-size:.85rem; color:var(--muted); font-weight:700">📄 Datos del Cliente (Extraídos de Venta - Editables)</span>
+              
+              <div class="grid-2">
+                <div>
+                  <label>Cliente</label>
+                  <input type="text" id="cfgNombre">
+                </div>
+                <div>
+                  <label>Cédula / RIF</label>
+                  <input type="text" id="cfgCedula">
+                </div>
+              </div>
+
+              <div class="grid-2">
+                <div>
+                  <label>Contacto</label>
+                  <input type="tel" id="cfgContacto">
+                </div>
+                <div>
+                  <label>Nodo</label>
+                  <input type="text" id="cfgNodo">
+                </div>
+              </div>
+
+              <label>Dirección Exacta</label>
+              <textarea id="cfgDireccion" rows="2"></textarea>
+
+              <div class="grid-2">
+                <div>
+                  <label>Plan de Servicio</label>
+                  <input type="text" id="cfgPlan">
+                </div>
+                <div>
+                  <label>Promoción</label>
+                  <input type="text" id="cfgPromo">
+                </div>
+              </div>
+            </div>
+
+            <div style="background:#0f172a; padding:.8rem; border-radius:.5rem; border:1px solid var(--accent)">
+              <span style="font-size:.85rem; color:var(--accent); font-weight:700">⚙️ Asignación Técnica de Equipo</span>
+              
+              <div class="grid-2">
+                <div>
+                  <label>Serial ONU / PON *</label>
+                  <input type="text" id="cfgSerial" placeholder="Ej: VSOL00E3E501" required>
+                </div>
+                <div>
+                  <label>PPPoE *</label>
+                  <input type="text" id="cfgPppoe" placeholder="usuario@ejemplo" required>
+                </div>
+              </div>
+
+              <div class="grid-2">
+                <div>
+                  <label>Modelo *</label>
+                  <input type="text" id="cfgModelo" placeholder="AX30-H, V2801S-B, WK-3801..." required>
+                </div>
+                <div>
+                  <label>Marca</label>
+                  <input type="text" id="cfgMarca" value="VSOL">
+                </div>
+              </div>
+
+              <div class="grid-2">
+                <div>
+                  <label>Usuario Admin ONU</label>
+                  <input type="text" id="cfgAdminUser" value="admin">
+                </div>
+                <div>
+                  <label>Clave Admin ONU</label>
+                  <input type="text" id="cfgAdminPass" value="admin123">
+                </div>
+              </div>
+
+              <label>Código de Fibra (Opcional)</label>
+              <input type="text" id="cfgCodigoFibra" placeholder="Ej: F-1234">
+
+              <label>Configurado Por</label>
+              <input type="text" id="cfgPor" placeholder="Técnico configurador">
+            </div>
+
+            <button type="submit" class="btn success" style="margin-top:1.2rem; font-size:1rem">⚙️ Guardar Configuración (Pasa a CONFIGURADO)</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- DESPACHO DE EQUIPOS A RUTA (Almacén / Logística) -->
+      <section id="view-despacho" class="view">
         <div class="card">
-          <h2>✅ Marcar como Instalado</h2>
-          <label>ID Instalación</label><input type="text" id="instId" placeholder="INS_001">
-          <button class="btn success" onclick="marcarInstalado()">✅ Confirmar Instalación</button>
+          <h2>🚚 Despacho de Equipos Configurados a Ruta</h2>
+          <p style="font-size:.85rem; color:var(--muted); margin-bottom:.75rem">Busca y selecciona los equipos con status <b>CONFIGURADO</b> para asignar al técnico:</p>
+          
+          <input type="text" id="despSearchInput" placeholder="🔍 Buscar por nombre de cliente, serial ONU o ID..." onkeyup="filtrarDespachoConfigurados()" style="margin-bottom:1rem; font-size:1rem">
+
+          <div id="listaConfiguradosDespacho" style="overflow-x:auto; margin-bottom:1rem"></div>
+
+          <label>Técnico / Instalador Asignado a la Ruta *</label>
+          <input type="text" id="despInstalador" placeholder="Escribe el nombre del técnico de campo..." style="font-size:1rem">
+
+          <button type="button" class="btn success" style="margin-top:1rem; font-size:1rem" onclick="enviarDespachoSeleccionados()">🚚 Despachar Seleccionados a Ruta</button>
+        </div>
+      </section>
+
+      <!-- INSTALACIONES / TÉCNICOS DE CAMPO -->
+      <section id="view-instalaciones" class="view">
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center">
+            <h2>📋 Vista de Campo (Instalaciones En Ruta)</h2>
+            <button class="btn" style="width:auto; padding:.4rem .8rem" onclick="cargarPendientes()">🔄 Recargar</button>
+          </div>
+          <p style="font-size:.85rem; color:var(--muted); margin-top:.3rem">Instalaciones asignadas <b>EN_RUTA</b> listas para confirmar instalación:</p>
+
+          <input type="text" id="instSearchInput" placeholder="🔍 Buscar por cliente, dirección o serial..." onkeyup="filtrarInstalacionesRuta()" style="margin:.75rem 0">
+
+          <div id="listaInstalacionesRuta"></div>
         </div>
       </section>
     </main>

@@ -74,17 +74,30 @@ class InstalacionUpdate(BaseModel):
 
 class InstalacionOut(BaseModel):
     id: str
+    id_venta: Optional[int] = None
     fecha_registro: datetime
     status: str
     nombre_cliente: str
-    promocion: Optional[str]
-    nodo: Optional[str]
-    cedula_rif: Optional[str]
-    serial_onu: Optional[str]
-    pppoe: Optional[str]
-    modelo: Optional[str]
-    instalador: Optional[str]
-    fecha_instalacion: Optional[date]
+    tipo_id: Optional[str] = "V"
+    cedula_rif: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    correo_electronico: Optional[str] = None
+    nro_contacto: Optional[str] = None
+    direccion_exacta: Optional[str] = None
+    plan_servicio: Optional[str] = None
+    promocion: Optional[str] = None
+    nodo: Optional[str] = None
+    serial_onu: Optional[str] = None
+    pppoe: Optional[str] = None
+    modelo: Optional[str] = None
+    marca: Optional[str] = None
+    codigo_fibra: Optional[str] = None
+    credencial_admin_usuario: Optional[str] = None
+    credencial_admin_clave: Optional[str] = None
+    instalador: Optional[str] = None
+    configurado_por: Optional[str] = None
+    fecha_instalacion: Optional[date] = None
+    observaciones: Optional[str] = None
     class Config:
         from_attributes = True
 
@@ -117,6 +130,7 @@ class VentaIn(BaseModel):
     nro_contacto: Optional[str] = None
     direccion_exacta: Optional[str] = None
     plan_servicio: Optional[str] = None
+    numero_servicio: Optional[str] = "1"
     observaciones: Optional[str] = None
 
 class VentaOut(VentaIn):
@@ -131,6 +145,13 @@ class VentaOut(VentaIn):
 # ---------- CONFIGURACIÓN / EETL ----------
 class ConfiguracionIn(BaseModel):
     id_instalacion: str
+    nombre_cliente: Optional[str] = None
+    cedula_rif: Optional[str] = None
+    nro_contacto: Optional[str] = None
+    direccion_exacta: Optional[str] = None
+    nodo: Optional[str] = None
+    plan_servicio: Optional[str] = None
+    promocion: Optional[str] = None
     serial_onu: Optional[str] = None
     pppoe: Optional[str] = None
     modelo: Optional[str] = None

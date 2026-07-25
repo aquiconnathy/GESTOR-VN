@@ -44,9 +44,17 @@ async def crear_venta(data: VentaIn, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(venta)
 
-    # Auto-crear instalación si no es EETL y está aprobada
-    if promo != "ESTE ES TU LUGAR" and venta.status_venta == "APROBADA":
-        id_inst = await next_seq(db, "seq_instalacion", "INS_", 3)
+    # Generar PPPoE automático: VN + NÚMEROS_CÉDULA + - + NÚMERO_SERVICIO
+    ced_digits = "".join(filter(str.isdigit, str(venta.cedula_rif or "")))
+    num_serv = str(venta.numero_servicio or "1").strip()
+    pppoe_auto = f"VN{ced_digits}-{num_serv}" if ced_digits else ""
+
+    # Auto-crear instalación si está aprobada
+    if venta.status_venta == "APROBADA":
+        prefix_id = "EETL_" if promo == "ESTE ES TU LUGAR" else "INS_"
+        seq_key = "seq_eetl" if promo == "ESTE ES TU LUGAR" else "seq_instalacion"
+        id_inst = await next_seq(db, seq_key, prefix_id, 3)
+
         inst = Instalacion(
             id=id_inst, id_venta=venta.id,
             asesor_venta=venta.asesor_venta, promocion=venta.promocion,
@@ -55,28 +63,24 @@ async def crear_venta(data: VentaIn, db: AsyncSession = Depends(get_db)):
             fecha_nacimiento=venta.fecha_nacimiento,
             correo_electronico=venta.correo_electronico,
             nro_contacto=venta.nro_contacto, direccion_exacta=venta.direccion_exacta,
-            plan_servicio=venta.plan_servicio, status="PENDIENTE_ASIGNAR"
+            plan_servicio=venta.plan_servicio, numero_servicio=num_serv,
+            pppoe=pppoe_auto, status="PENDIENTE_ASIGNAR"
         )
         db.add(inst)
         venta.id_instalacion = id_inst
         await db.commit()
 
         msg = (
-            f"<b>NUEVA INSTALACION PENDIENTE</b>\n\n"
+            f"<b>NUEVA INSTALACION PENDIENTE ({promo or 'ESTÁNDAR'})</b>\n\n"
             f"<b>ID:</b> {id_inst}\n"
             f"<b>Cliente:</b> {venta.nombre_cliente}\n"
+            f"<b>PPPoE Sugerido:</b> <code>{pppoe_auto}</code>\n"
             f"<b>Nodo:</b> {venta.nodo or '-'}\n"
             f"<b>Promocion:</b> {venta.promocion or '-'}\n"
             f"<b>Status:</b> PENDIENTE_ASIGNAR\n\n"
             f"<b>Requiere asignacion de equipo.</b>"
         )
         await tg_service.send_message(settings.CHAT_ID, msg, key_notif=f"nueva_{id_inst}", db=db)
-
-    elif promo == "ESTE ES TU LUGAR":
-        id_inst = await next_seq(db, "seq_eetl", "EETL_", 3)
-        venta.id_instalacion = id_inst
-        venta.status_instalacion = "PENDIENTE_ASIGNAR"
-        await db.commit()
 
     return VentaOut.model_validate(venta)
 

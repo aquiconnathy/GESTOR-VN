@@ -263,12 +263,22 @@ async function syncPending() {
 }
 
 // ================= VENTAS =================
+function calcularPppoePreviewVenta() {
+  const ced = document.getElementById('vtaCedula').value.replace(/\D/g, '');
+  const num = document.getElementById('vtaNumServicio') ? document.getElementById('vtaNumServicio').value || '1' : '1';
+  const previewEl = document.getElementById('vtaPppoePreview');
+  if (previewEl) {
+    previewEl.value = ced ? `VN${ced}-${num}` : '';
+  }
+}
+
 async function handleCrearVenta(e) {
   if (e) e.preventDefault();
   const nombre = document.getElementById('vtaNombre').value.trim();
   const tipoId = document.getElementById('vtaTipoId').value;
   const cedula = document.getElementById('vtaCedula').value.trim();
   const contacto = document.getElementById('vtaContacto').value.trim();
+  const numServicio = document.getElementById('vtaNumServicio') ? document.getElementById('vtaNumServicio').value || '1' : '1';
 
   if (!nombre || !cedula || !contacto) {
     return toast('Nombre, Cédula y Contacto son obligatorios', 'error');
@@ -284,6 +294,7 @@ async function handleCrearVenta(e) {
     nodo: document.getElementById('vtaNodo').value,
     plan_servicio: document.getElementById('vtaPlan').value,
     promocion: document.getElementById('vtaPromo').value,
+    numero_servicio: numServicio,
     asesor_venta: currentUser ? currentUser.nombre : 'PWA App',
     observaciones: document.getElementById('vtaObs').value.trim()
   };
@@ -542,66 +553,276 @@ async function enviarRecepcion() {
   }
 }
 
-// ================= PENDIENTES =================
+// ================= CICLO DE VIDA (PENDIENTES, CONFIGURACIÓN, DESPACHO, CAMPO) =================
+let instalacionesCache = [];
+
 async function cargarPendientes() {
-  const container = document.getElementById('listaPendientes');
-  container.innerHTML = '<p style="color:var(--muted)">Cargando instalaciones...</p>';
   try {
     const data = await apiGet('/instalaciones/pendientes');
-    if (!data || !data.length) { container.innerHTML = '<p style="color:var(--muted)">Sin pendientes</p>'; return; }
-    let html = '<table><thead><tr><th>ID</th><th>Cliente</th><th>Nodo</th><th>Plan</th><th>Status</th></tr></thead><tbody>';
-    data.forEach(i => {
-      const badge = (i.status || 'PENDIENTE').toLowerCase().replace('_','');
-      html += `<tr><td><b>${i.id}</b></td><td>${i.nombre_cliente}</td><td>${i.nodo||'-'}</td><td>${i.plan_servicio||'-'}</td><td><span class="badge ${badge}">${i.status}</span></td></tr>`;
-    });
-    html += 'tbody></table>';
-    container.innerHTML = html;
+    instalacionesCache = data || [];
+
+    poblarSelectConfig();
+    poblarDespachoConfigurados();
+    poblarInstalacionesRuta();
   } catch (e) {
-    container.innerHTML = '<p style="color:var(--danger)">Error cargando instalaciones</p>';
+    console.error('Error cargando instalaciones:', e);
   }
 }
 
-// ================= DESPACHO =================
-async function enviarDespacho() {
-  const ids = document.getElementById('despIds').value.split(',').map(s => s.trim()).filter(Boolean);
-  if (!ids.length) return toast('Ingresa al menos un ID', 'error');
+// ---------- 1. CONFIGURACIÓN (Técnico Config) ----------
+function poblarSelectConfig() {
+  const selectEl = document.getElementById('cfgInstSelect');
+  if (!selectEl) return;
+
+  const pendientes = instalacionesCache.filter(i => (i.status || '').toUpperCase() === 'PENDIENTE_ASIGNAR' || (i.status || '').toUpperCase() === 'PENDIENTE');
+  
+  if (!pendientes.length) {
+    selectEl.innerHTML = '<option value="">Sin instalaciones pendientes de asignar</option>';
+    return;
+  }
+
+  let html = '<option value="">-- Selecciona una Instalación Pendiente --</option>';
+  pendientes.forEach(i => {
+    html += `<option value="${i.id}">${i.id} | ${i.nombre_cliente} (${i.promocion || 'Estándar'})</option>`;
+  });
+  selectEl.innerHTML = html;
+}
+
+function handleSelectInstalacionConfig(selectEl) {
+  const id = selectEl.value;
+  if (!id) return;
+  const inst = instalacionesCache.find(i => i.id === id);
+  if (!inst) return;
+
+  document.getElementById('cfgId').value = inst.id;
+  document.getElementById('cfgNombre').value = inst.nombre_cliente || '';
+  document.getElementById('cfgCedula').value = inst.cedula_rif || '';
+  document.getElementById('cfgContacto').value = inst.nro_contacto || '';
+  document.getElementById('cfgNodo').value = inst.nodo || '';
+  document.getElementById('cfgDireccion').value = inst.direccion_exacta || '';
+  document.getElementById('cfgPlan').value = inst.plan_servicio || '';
+  document.getElementById('cfgPromo').value = inst.promocion || '';
+
+  document.getElementById('cfgSerial').value = inst.serial_onu || '';
+  
+  const cedDigits = (inst.cedula_rif || '').replace(/\D/g, '');
+  const numServ = inst.numero_servicio || '1';
+  const pppoeAuto = inst.pppoe || (cedDigits ? `VN${cedDigits}-${numServ}` : '');
+  document.getElementById('cfgPppoe').value = pppoeAuto;
+
+  document.getElementById('cfgModelo').value = inst.modelo || 'AX30-H';
+  document.getElementById('cfgMarca').value = inst.marca || 'VSOL';
+  document.getElementById('cfgCodigoFibra').value = inst.codigo_fibra || '';
+  document.getElementById('cfgAdminUser').value = inst.credencial_admin_usuario || 'admin';
+  document.getElementById('cfgAdminPass').value = inst.credencial_admin_clave || 'admin123';
+  document.getElementById('cfgPor').value = currentUser ? currentUser.nombre : '';
+}
+
+async function handleGuardarConfig(e) {
+  e.preventDefault();
+  const id_inst = document.getElementById('cfgId').value;
+  if (!id_inst) return toast('Selecciona una instalación de la lista', 'error');
+
   try {
-    const data = await apiPost('/instalaciones/despachar', {
+    toast('Guardando configuración...', 'info');
+    const res = await apiPost('/instalaciones/configurar', {
+      id_instalacion: id_inst,
+      nombre_cliente: document.getElementById('cfgNombre').value.trim(),
+      cedula_rif: document.getElementById('cfgCedula').value.trim(),
+      nro_contacto: document.getElementById('cfgContacto').value.trim(),
+      direccion_exacta: document.getElementById('cfgDireccion').value.trim(),
+      nodo: document.getElementById('cfgNodo').value.trim(),
+      plan_servicio: document.getElementById('cfgPlan').value.trim(),
+      promocion: document.getElementById('cfgPromo').value.trim(),
+      serial_onu: document.getElementById('cfgSerial').value.trim().toUpperCase(),
+      pppoe: document.getElementById('cfgPppoe').value.trim(),
+      modelo: document.getElementById('cfgModelo').value.trim().toUpperCase(),
+      marca: document.getElementById('cfgMarca').value.trim(),
+      codigo_fibra: document.getElementById('cfgCodigoFibra').value.trim(),
+      credencial_admin_usuario: document.getElementById('cfgAdminUser').value.trim(),
+      credencial_admin_clave: document.getElementById('cfgAdminPass').value.trim(),
+      configurado_por: document.getElementById('cfgPor').value.trim()
+    });
+
+    toast('✅ Equipo configurado con éxito (Pasa a CONFIGURADO)');
+    cargarPendientes();
+  } catch (err) {
+    toast('Error en configuración: ' + err.message, 'error');
+  }
+}
+
+// ---------- 2. DESPACHO DE CONFIGURADOS (Almacén / Logística) ----------
+function poblarDespachoConfigurados(filtro = '') {
+  const container = document.getElementById('listaConfiguradosDespacho');
+  if (!container) return;
+
+  let configurados = instalacionesCache.filter(i => (i.status || '').toUpperCase() === 'CONFIGURADO');
+  
+  if (filtro.trim()) {
+    const f = filtro.toLowerCase();
+    configurados = configurados.filter(i => 
+      (i.id || '').toLowerCase().includes(f) ||
+      (i.nombre_cliente || '').toLowerCase().includes(f) ||
+      (i.serial_onu || '').toLowerCase().includes(f)
+    );
+  }
+
+  if (!configurados.length) {
+    container.innerHTML = '<p style="color:var(--muted)">Sin equipos configurados pendientes por despachar.</p>';
+    return;
+  }
+
+  let html = '<table><thead><tr><th>Seleccionar</th><th>ID</th><th>Cliente</th><th>Nodo</th><th>Serial ONU</th><th>Modelo</th></tr></thead><tbody>';
+  configurados.forEach(i => {
+    html += `<tr>
+      <td style="text-align:center"><input type="checkbox" class="chk-despacho" value="${i.id}" style="transform:scale(1.3)"></td>
+      <td><b>${i.id}</b></td>
+      <td>${i.nombre_cliente}</td>
+      <td>${i.nodo || '-'}</td>
+      <td><code>${i.serial_onu || '-'}</code></td>
+      <td>${i.modelo || '-'}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function filtrarDespachoConfigurados() {
+  const q = document.getElementById('despSearchInput').value;
+  poblarDespachoConfigurados(q);
+}
+
+async function enviarDespachoSeleccionados() {
+  const checkboxes = document.querySelectorAll('.chk-despacho:checked');
+  const ids = Array.from(checkboxes).map(c => c.value);
+  const instalador = document.getElementById('despInstalador').value.trim();
+
+  if (!ids.length) return toast('Selecciona al menos un equipo configurado con el checkbox', 'error');
+  if (!instalador) return toast('Escribe el nombre del técnico de campo asignado', 'error');
+
+  try {
+    toast('Despachando a ruta...', 'info');
+    const res = await apiPost('/instalaciones/despachar', {
       id_instalaciones: ids,
-      instalador: document.getElementById('despInstalador').value || 'Técnico'
+      instalador: instalador
     });
-    toast(data.message);
-  } catch (e) {
-    toast('Error: ' + e.message, 'error');
+    toast(`✅ ${res.message} (Pasan a EN_RUTA)`);
+    document.getElementById('despInstalador').value = '';
+    cargarPendientes();
+  } catch (err) {
+    toast('Error en despacho: ' + err.message, 'error');
   }
 }
 
-// ================= CONFIGURAR =================
-async function enviarConfig() {
+// ---------- 3. CAMPO / TÉCNICOS (Confirmación de Instalación) ----------
+function poblarInstalacionesRuta(filtro = '') {
+  const container = document.getElementById('listaInstalacionesRuta');
+  if (!container) return;
+
+  let enRuta = instalacionesCache.filter(i => (i.status || '').toUpperCase() === 'EN_RUTA');
+
+  if (filtro.trim()) {
+    const f = filtro.toLowerCase();
+    enRuta = enRuta.filter(i => 
+      (i.id || '').toLowerCase().includes(f) ||
+      (i.nombre_cliente || '').toLowerCase().includes(f) ||
+      (i.direccion_exacta || '').toLowerCase().includes(f) ||
+      (i.serial_onu || '').toLowerCase().includes(f)
+    );
+  }
+
+  if (!enRuta.length) {
+    container.innerHTML = '<p style="color:var(--muted)">Sin instalaciones en ruta activas.</p>';
+    return;
+  }
+
+  let html = '';
+  enRuta.forEach(i => {
+    const isEETL = (i.promocion || '').toUpperCase().includes('LUGAR') || (i.promocion || '').toUpperCase().includes('EETL');
+    
+    html += `
+      <div style="background:#1e293b; padding:1rem; border-radius:.5rem; margin-bottom:1rem; border:1px solid ${isEETL ? '#f59e0b' : 'var(--accent)'}">
+        <div style="display:flex; justify-content:space-between; align-items:center">
+          <h3 style="margin:0; color:var(--text)">${i.id} | ${i.nombre_cliente}</h3>
+          <span class="badge ${isEETL ? 'eetl' : 'enruta'}">${isEETL ? 'ESTE ES TU LUGAR (EETL)' : 'EN_RUTA'}</span>
+        </div>
+        <p style="font-size:.85rem; color:var(--muted); margin:.4rem 0">
+          📍 <b>Nodo:</b> ${i.nodo || '-'} | 📞 <b>Contacto:</b> ${i.nro_contacto || '-'} | 🏠 <b>Dirección:</b> ${i.direccion_exacta || '-'}<br>
+          ⚡ <b>Plan:</b> ${i.plan_servicio || '-'} | 🔌 <b>Serial:</b> <code>${i.serial_onu || '-'}</code> | 🌐 <b>PPPoE:</b> <code>${i.pppoe || '-'}</code>
+        </p>`;
+
+    if (isEETL) {
+      html += `
+        <div style="background:#0f172a; padding:.75rem; border-radius:.4rem; margin-top:.5rem">
+          <span style="font-size:.8rem; color:#f59e0b; font-weight:700">📡 Datos del Equipo Propio (EETL):</span>
+          <div class="grid-2" style="margin-top:.4rem">
+            <input type="text" id="eetlSerial_${i.id}" placeholder="Serial PON Equipo Propio *" value="${i.serial_onu||''}">
+            <input type="text" id="eetlModelo_${i.id}" placeholder="Modelo Equipo Propio *" value="${i.modelo||''}">
+          </div>
+          <div class="grid-2" style="margin-top:.4rem">
+            <input type="text" id="eetlMarca_${i.id}" placeholder="Marca *" value="${i.marca||'VSOL'}">
+            <input type="text" id="eetlFibra_${i.id}" placeholder="Código Fibra (Opcional)">
+          </div>
+          <button class="btn success" style="margin-top:.6rem; width:100%" onclick="confirmarEETLCampo('${i.id}')">📡 Confirmar Instalación EETL (Equipo Propio)</button>
+        </div>`;
+    } else {
+      html += `<button class="btn success" style="margin-top:.6rem; width:100%" onclick="confirmarInstalacionCampo('${i.id}')">✅ Confirmar Instalación Completada</button>`;
+    }
+
+    html += `</div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+function filtrarInstalacionesRuta() {
+  const q = document.getElementById('instSearchInput').value;
+  poblarInstalacionesRuta(q);
+}
+
+async function confirmarInstalacionCampo(idInst) {
   try {
-    const data = await apiPost('/instalaciones/configurar', {
-      id_instalacion: document.getElementById('cfgId').value,
-      serial_onu: document.getElementById('cfgSerial').value,
-      pppoe: document.getElementById('cfgPppoe').value,
-      modelo: document.getElementById('cfgModelo').value,
-      configurado_por: document.getElementById('cfgPor').value
+    toast('Confirmando instalación...', 'info');
+    const res = await apiPost('/instalaciones/instalado', {
+      id_instalacion: idInst,
+      instalado_por: currentUser ? currentUser.nombre : 'Técnico Campo'
     });
-    toast(data.message);
-  } catch (e) {
-    toast('Error: ' + e.message, 'error');
+    toast('✅ Instalación completada con éxito');
+    cargarPendientes();
+  } catch (err) {
+    toast('Error al confirmar instalación: ' + err.message, 'error');
   }
 }
 
-// ================= INSTALADO =================
-async function marcarInstalado() {
+async function confirmarEETLCampo(idInst) {
+  const inst = instalacionesCache.find(i => i.id === idInst);
+  const serial = document.getElementById(`eetlSerial_${idInst}`).value.trim();
+  const modelo = document.getElementById(`eetlModelo_${idInst}`).value.trim();
+  const marca = document.getElementById(`eetlMarca_${idInst}`).value.trim();
+  const fibra = document.getElementById(`eetlFibra_${idInst}`).value.trim();
+
+  if (!serial || !modelo) return toast('Escribe el serial PON y el modelo del equipo propio', 'error');
+
   try {
-    const data = await apiPost('/instalaciones/instalado', {
-      id_instalacion: document.getElementById('instId').value,
-      instalado_por: currentUser ? currentUser.nombre : 'Técnico'
+    toast('Procesando migración EETL...', 'info');
+    const res = await apiPost('/instalaciones/eetl', {
+      id_instalacion: idInst,
+      serial_pon: serial.toUpperCase(),
+      modelo: modelo.toUpperCase(),
+      marca: marca || 'VSOL',
+      codigo_fibra: fibra,
+      nombre_cliente: inst ? inst.nombre_cliente : '',
+      cedula_rif: inst ? inst.cedula_rif : '',
+      nro_contacto: inst ? inst.nro_contacto : '',
+      direccion: inst ? inst.direccion_exacta : '',
+      plan: inst ? inst.plan_servicio : '',
+      nodo: inst ? inst.nodo : '',
+      instalado_por: currentUser ? currentUser.nombre : 'Técnico Campo'
     });
-    toast(data.message);
-  } catch (e) {
-    toast('Error: ' + e.message, 'error');
+    toast('✅ Instalación EETL completada con éxito');
+    cargarPendientes();
+  } catch (err) {
+    toast('Error en confirmación EETL: ' + err.message, 'error');
   }
 }
 
