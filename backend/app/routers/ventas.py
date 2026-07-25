@@ -103,6 +103,9 @@ async def sincronizar_ventas(db: AsyncSession = Depends(get_db)):
 
 @router.get("/listar", response_model=List[VentaOut])
 async def listar_ventas(db: AsyncSession = Depends(get_db)):
-    stmt = select(Venta).order_by(Venta.id.desc())
-    res = await db.execute(stmt)
-    return [VentaOut.model_validate(v) for v in res.scalars().all()]
+    try:
+        stmt = select(Venta).order_by(Venta.id.desc())
+        res = await db.execute(stmt)
+        return [VentaOut.model_validate(v) for v in res.scalars().all()]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al listar ventas: {str(e)}")
