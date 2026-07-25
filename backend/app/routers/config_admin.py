@@ -16,16 +16,26 @@ DEFAULT_SETTINGS = {
         {"nombre": "PROMO 50% DESCUENTO", "pasa_por_config": True},
         {"nombre": "MIGRACIÓN DIRECTA", "pasa_por_config": False}
     ],
+    "planes": [
+        "PLAN 100 MEGA FIBRA",
+        "PLAN 200 MEGA FIBRA",
+        "PLAN 300 MEGA FIBRA",
+        "PLAN 500 MEGA FIBRA",
+        "PLAN GIGA FIBRA DEDICADO"
+    ],
     "nodos": ["NODO CENTRO", "NODO NORTE", "NODO SUR", "NODO ESTE", "NODO OESTE"],
     "metodos_pago": ["PAGO MÓVIL", "ZELLE", "TRANSFERENCIA BANCARIA", "EFECTIVO USD", "USDT BINANCE"],
-    "modelos_equipos": ["AX30-H", "V2801S-B", "AC1200", "V2804AX30-H", "HG8145V5", "F670L", "WK-3801"]
+    "modelos_equipos": ["AX30-H", "V2801S-B", "AC1200", "V2804AX30-H", "HG8145V5", "F670L", "WK-3801"],
+    "menu_orden": ["dashboard", "ventas", "recepcion", "instalaciones", "despacho", "config", "evaluacion", "admin-config"]
 }
 
 class SystemSettings(BaseModel):
-    promociones: List[Dict[str, Any]]
-    nodos: List[str]
-    metodos_pago: List[str]
-    modelos_equipos: List[str]
+    promociones: Optional[List[Dict[str, Any]]] = None
+    planes: Optional[List[str]] = None
+    nodos: Optional[List[str]] = None
+    metodos_pago: Optional[List[str]] = None
+    modelos_equipos: Optional[List[str]] = None
+    menu_orden: Optional[List[str]] = None
 
 @router.get("/settings")
 async def obtener_configuracion_sistema(db: AsyncSession = Depends(get_db)):

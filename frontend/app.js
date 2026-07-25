@@ -79,16 +79,22 @@ function applyRolePermissions() {
 
   const allowedViews = permissions[rol] || ['dashboard', 'ventas'];
   
-  // Mostrar/Ocultar botones del menú
-  ['dashboard', 'ventas', 'recepcion', 'instalaciones', 'despacho', 'config', 'evaluacion', 'admin-config'].forEach(v => {
-    const btn = document.getElementById('nav-' + v);
-    if (btn) {
-      btn.style.display = allowedViews.includes(v) ? 'inline-block' : 'none';
-    }
-  });
+  // Reordenar botones en el DOM según el orden guardado
+  const navContainer = document.getElementById('mainNav');
+  const savedOrder = adminSettingsCache.menu_orden || ['dashboard', 'ventas', 'recepcion', 'instalaciones', 'despacho', 'config', 'evaluacion', 'admin-config'];
+  
+  if (navContainer) {
+    savedOrder.forEach(v => {
+      const btn = document.getElementById('nav-' + v);
+      if (btn) {
+        btn.style.display = allowedViews.includes(v) ? 'flex' : 'none';
+        navContainer.appendChild(btn); // Re-anexa en el orden deseado
+      }
+    });
+  }
 
   // Activar primera pestaña disponible
-  const firstAllowed = allowedViews[0];
+  const firstAllowed = savedOrder.find(v => allowedViews.includes(v)) || allowedViews[0];
   if (firstAllowed) showView(firstAllowed);
 }
 
@@ -1028,7 +1034,46 @@ async function cargarConfiguracionSistemaAdmin() {
   }
 }
 
+const ALL_TABS_MAP = {
+  dashboard: '📊 Dashboard',
+  ventas: '🛒 Ventas',
+  recepcion: '📥 Recepción',
+  instalaciones: '📋 Instalaciones',
+  despacho: '🚚 Despacho',
+  config: '⚙️ Configurar',
+  evaluacion: '🧪 Evaluación',
+  'admin-config': '⚙️ Config Admin'
+};
+
 function renderAdminSettingsUI() {
+  // Reordenar Menú UI
+  const containerMenu = document.getElementById('adminListaMenuOrden');
+  if (containerMenu) {
+    let html = '';
+    const tabs = adminSettingsCache.menu_orden || ['dashboard', 'ventas', 'recepcion', 'instalaciones', 'despacho', 'config', 'evaluacion', 'admin-config'];
+    tabs.forEach((tabId, idx) => {
+      const label = ALL_TABS_MAP[tabId] || tabId;
+      html += `<div style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; padding:.4rem .8rem; border-radius:.4rem">
+        <span><b>${label}</b></span>
+        <div style="display:flex; gap:.3rem">
+          <button type="button" class="btn" style="padding:.25rem .6rem; font-size:.8rem; width:auto; margin:0; background:#334155" onclick="moverPestanaMenu(${idx}, -1)" ${idx === 0 ? 'disabled' : ''}>⬆️ Subir</button>
+          <button type="button" class="btn" style="padding:.25rem .6rem; font-size:.8rem; width:auto; margin:0; background:#334155" onclick="moverPestanaMenu(${idx}, 1)" ${idx === tabs.length - 1 ? 'disabled' : ''}>⬇️ Bajar</button>
+        </div>
+      </div>`;
+    });
+    containerMenu.innerHTML = html;
+  }
+
+  // Planes UI
+  const containerPlanes = document.getElementById('adminListaPlanes');
+  if (containerPlanes) {
+    let html = '';
+    (adminSettingsCache.planes || []).forEach((pl, idx) => {
+      html += `<span class="badge" style="background:#065f46; font-size:.85rem; padding:.3rem .6rem">${pl} <b style="cursor:pointer; color:#ef4444; margin-left:.4rem" onclick="eliminarPlanAdmin(${idx})">×</b></span>`;
+    });
+    containerPlanes.innerHTML = html || '<p style="color:var(--muted)">Sin planes configurados</p>';
+  }
+
   const containerNodos = document.getElementById('adminListaNodos');
   if (containerNodos) {
     let html = '';
@@ -1059,6 +1104,37 @@ function renderAdminSettingsUI() {
       html += `<span class="badge" style="background:#065f46; font-size:.85rem; padding:.3rem .6rem">${m} <b style="cursor:pointer; color:#ef4444; margin-left:.4rem" onclick="eliminarMetodoPagoAdmin(${idx})">×</b></span>`;
     });
     containerPagos.innerHTML = html || '<p style="color:var(--muted)">Sin métodos de pago configurados</p>';
+  }
+}
+
+function moverPestanaMenu(idx, dir) {
+  if (!adminSettingsCache.menu_orden) {
+    adminSettingsCache.menu_orden = ['dashboard', 'ventas', 'recepcion', 'instalaciones', 'despacho', 'config', 'evaluacion', 'admin-config'];
+  }
+  const targetIdx = idx + dir;
+  if (targetIdx < 0 || targetIdx >= adminSettingsCache.menu_orden.length) return;
+  const temp = adminSettingsCache.menu_orden[idx];
+  adminSettingsCache.menu_orden[idx] = adminSettingsCache.menu_orden[targetIdx];
+  adminSettingsCache.menu_orden[targetIdx] = temp;
+  renderAdminSettingsUI();
+  if (currentUser) applyRolePermissions(currentUser.rol);
+}
+
+function agregarPlanAdmin() {
+  const val = document.getElementById('adminNuevoPlan').value.trim().toUpperCase();
+  if (!val) return;
+  if (!adminSettingsCache.planes) adminSettingsCache.planes = [];
+  if (!adminSettingsCache.planes.includes(val)) {
+    adminSettingsCache.planes.push(val);
+    renderAdminSettingsUI();
+  }
+  document.getElementById('adminNuevoPlan').value = '';
+}
+
+function eliminarPlanAdmin(idx) {
+  if (adminSettingsCache.planes) {
+    adminSettingsCache.planes.splice(idx, 1);
+    renderAdminSettingsUI();
   }
 }
 

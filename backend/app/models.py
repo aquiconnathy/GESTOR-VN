@@ -125,6 +125,7 @@ class ConfigSystem(Base):
     __tablename__ = "config_system"
     key = Column(String, primary_key=True)
     value_int = Column(Integer, default=0)
+    value_str = Column(Text)
     value_text = Column(Text)
 
 class TelegramLog(Base):
@@ -142,3 +143,17 @@ class Usuario(Base):
     rol = Column(String, nullable=False)
     activo = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class Evaluacion(Base):
+    __tablename__ = "evaluaciones"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    serial_pon = Column(String, nullable=False)
+    modelo = Column(String)
+    marca = Column(String, default="VSOL")
+    motivo = Column(String)
+    dictamen = Column(String)
+    nombre_cliente = Column(Text)
+    tecnico = Column(Text)
+    observaciones = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

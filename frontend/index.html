@@ -416,6 +416,8 @@
 
           <div id="listaInstalacionesRuta"></div>
         </div>
+      </section>
+
       <!-- EVALUACIÓN / LABORATORIO TÉCNICO -->
       <section id="view-evaluacion" class="view">
         <div class="card">
@@ -459,7 +461,7 @@
         <div class="card">
           <div style="display:flex; justify-content:space-between; align-items:center">
             <h2>🔬 Equipos Actualmente en Evaluación / Taller</h2>
-            <button class="btn" style="width:auto; padding:.3rem .7rem; font-size:.8rem" onclick="cargarEquiposEvaluacion()">🔄 Actualizar</button>
+            <button type="button" class="btn" style="width:auto; padding:.3rem .7rem; font-size:.8rem" onclick="cargarEquiposEvaluacion()">🔄 Actualizar</button>
           </div>
           <div id="listaEquiposEvaluacion" style="margin-top:1rem; overflow-x:auto"></div>
         </div>
@@ -469,7 +471,24 @@
       <section id="view-admin-config" class="view">
         <div class="card">
           <h2>⚙️ Panel de Configuración General del Sistema (ADMIN)</h2>
+
+          <!-- REORDENADOR DE PESTAÑAS -->
+          <div style="background:#182232; padding:.8rem; border-radius:.5rem; margin-bottom:1.2rem; border:1px solid #3b82f6">
+            <h3 style="color:#3b82f6; margin:0 0 .5rem 0">📱 Orden de Pestañas del Menú para Todos los Usuarios</h3>
+            <p style="font-size:.8rem; color:var(--muted); margin-bottom:.5rem">Usa las flechas ⬆️ ⬇️ para cambiar la posición de cada vista en el menú lateral:</p>
+            <div id="adminListaMenuOrden" style="display:flex; flex-direction:column; gap:.4rem"></div>
+          </div>
           
+          <!-- PLANES DE SERVICIO -->
+          <div style="background:#182232; padding:.8rem; border-radius:.5rem; margin-bottom:1.2rem; border:1px solid #10b981">
+            <h3 style="color:#10b981; margin:0 0 .5rem 0">🚀 Planes de Servicio</h3>
+            <div style="display:flex; gap:.5rem; margin-bottom:.5rem">
+              <input type="text" id="adminNuevoPlan" placeholder="Escribe nuevo plan de servicio..." style="flex:1">
+              <button type="button" class="btn success" style="width:auto; padding:0 1rem; margin:0" onclick="agregarPlanAdmin()">+ Agregar</button>
+            </div>
+            <div id="adminListaPlanes" style="display:flex; flex-wrap:wrap; gap:.5rem"></div>
+          </div>
+
           <div style="background:#182232; padding:.8rem; border-radius:.5rem; margin-bottom:1.2rem; border:1px solid var(--accent)">
             <h3 style="color:var(--accent); margin:0 0 .5rem 0">📍 Nodos y Zonas de Cobertura</h3>
             <div style="display:flex; gap:.5rem; margin-bottom:.5rem">
