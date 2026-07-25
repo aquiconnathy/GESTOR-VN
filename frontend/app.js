@@ -293,124 +293,165 @@ function setScanStatus(msg, isError = false) {
   }
 }
 
+function getModeloActivo() {
+  const sel = document.getElementById('recModeloSelect');
+  if (!sel) return 'AX30-H';
+  if (sel.value === '__NEW__') {
+    const input = document.getElementById('recNuevoModeloInput');
+    return input && input.value.trim() ? input.value.trim().toUpperCase() : 'NUEVO_MODELO';
+  }
+  return sel.value;
+}
+
+function handleModeloChange(selectEl) {
+  const box = document.getElementById('boxNuevoModelo');
+  if (!box) return;
+  if (selectEl.value === '__NEW__') {
+    box.style.display = 'block';
+    const input = document.getElementById('recNuevoModeloInput');
+    if (input) input.focus();
+  } else {
+    box.style.display = 'none';
+  }
+}
+
 function processBarcodeResult(decodedText) {
   if (!decodedText) return;
   
-  // Limpiar prefijos comunes y espacios
   let raw = decodedText.trim()
     .replace(/^(SN|S\/N|PON S\/N|PON|MAC):\s*/i, '')
     .replace(/[\r\n\t\s]/g, '')
     .toUpperCase();
 
-  // Aceptar cualquier serial alfanumérico válido
   if (/^[A-Z0-9\-\_]{4,32}$/.test(raw)) {
     const serial = raw;
     if (!scanned.includes(serial)) {
       scanned.push(serial);
       playBeep();
-      document.getElementById('scannedList').value = scanned.map(s => s + ',AX30-H').join('\n');
-      document.getElementById('scanCount').textContent = scanned.length;
-      setScanStatus('✅ Último serial agredado: ' + serial);
+      const listEl = document.getElementById('scannedList');
+      const modelo = getModeloActivo();
+      const newLine = `${serial},${modelo}`;
+      listEl.value = listEl.value.trim() ? listEl.value.trim() + '\n' + newLine : newLine;
+      actualizarConteoLista();
+      setScanStatus('✅ Agregado: ' + serial + ' (' + modelo + ')');
       toast('✅ Serial detectado: ' + serial);
     }
   }
 }
 
-// ================= ESCÁNER EN VIVO =================
+function handleFastInput(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    agregarSerialManual();
+  }
+}
+
+function agregarSerialManual() {
+  const input = document.getElementById('fastSerialInput');
+  if (!input) return;
+  let val = input.value.trim()
+    .replace(/^(SN|S\/N|PON S\/N|PON|MAC):\s*/i, '')
+    .replace(/[\r\n\t\s]/g, '')
+    .toUpperCase();
+    
+  if (!val) return;
+
+  if (!scanned.includes(val)) {
+    scanned.push(val);
+    playBeep();
+    const listEl = document.getElementById('scannedList');
+    const modelo = getModeloActivo();
+    const newLine = `${val},${modelo}`;
+    listEl.value = listEl.value.trim() ? listEl.value.trim() + '\n' + newLine : newLine;
+    actualizarConteoLista();
+    toast(`⚡ Agregado: ${val} (${modelo})`);
+  } else {
+    toast('⚠️ Serial ya está en la lista', 'error');
+  }
+  input.value = '';
+  input.focus();
+}
+
+function actualizarConteoLista() {
+  const raw = document.getElementById('scannedList').value.trim();
+  if (!raw) {
+    document.getElementById('scanCount').textContent = '0';
+    scanned = [];
+    return;
+  }
+  const lines = raw.split('\n').map(l => l.split(',')[0].trim()).filter(Boolean);
+  scanned = [...new Set(lines)];
+  document.getElementById('scanCount').textContent = scanned.length;
+}
+
+// ================= CÁMARA =================
 function toggleScanner() {
-  setScanStatus('Solicitando acceso a la cámara...');
+  const reader = document.getElementById('reader');
+  if (!reader) return;
   
-  if (typeof Html5Qrcode === 'undefined') {
-    setScanStatus('⚠️ Librería de escáner no cargada. Usa "Tomar Foto"', true);
-    return toast('Librería de cámara no disponible', 'error');
+  if (reader.style.display === 'block') {
+    reader.style.display = 'none';
+    if (html5QrCode) {
+      html5QrCode.stop().then(() => { html5QrCode = null; }).catch(() => { html5QrCode = null; });
+    }
+    return;
   }
 
-  const reader = document.getElementById('reader');
-  if (html5QrCode) {
-    setScanStatus('Cámara detenida.');
-    html5QrCode.stop().then(() => { 
-      html5QrCode = null; 
-      reader.innerHTML = ''; 
-    }).catch(() => {
-      html5QrCode = null;
-      reader.innerHTML = '';
-    });
+  reader.style.display = 'block';
+  setScanStatus('Solicitando acceso a la cámara...');
+
+  if (typeof Html5Qrcode === 'undefined') {
+    setScanStatus('⚠️ Librería de cámara no disponible', true);
     return;
   }
 
   try {
     html5QrCode = new Html5Qrcode("reader");
-
-    const config = {
-      fps: 15,
-      qrbox: { width: 280, height: 100 }
-    };
-
     html5QrCode.start(
       { facingMode: "environment" },
-      config,
+      { fps: 15, qrbox: { width: 280, height: 100 } },
       processBarcodeResult,
       () => {}
     ).then(() => {
-      setScanStatus('📷 Cámara activa - Apunta al código PON S/N');
+      setScanStatus('📷 Cámara activa - Apunta al código');
     }).catch(err => {
-      setScanStatus('❌ No se pudo abrir la cámara. Usa "Tomar Foto"', true);
-      toast('Error al abrir la cámara: ' + (err.message || err), 'error');
+      setScanStatus('❌ Error al abrir cámara: ' + (err.message || err), true);
       html5QrCode = null;
     });
   } catch (err) {
     setScanStatus('❌ Error: ' + err.message, true);
-    toast('Error: ' + err.message, 'error');
     html5QrCode = null;
   }
-}
-
-// ================= ESCÁNER POR FOTO NATIVA =================
-function handleFileScan(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  setScanStatus('🔍 Analizando foto...');
-  toast('Procesando foto de etiqueta...', 'info');
-
-  if (typeof Html5Qrcode === 'undefined') {
-    setScanStatus('⚠️ Librería no cargada', true);
-    return;
-  }
-
-  const scanner = new Html5Qrcode("reader");
-  scanner.scanFile(file, true)
-    .then(decodedText => {
-      processBarcodeResult(decodedText);
-      setScanStatus('✅ Código leído desde foto exitosamente!');
-    })
-    .catch(err => {
-      setScanStatus('⚠️ No se detectó el código en la foto. Intenta tomarla más de cerca.', true);
-      toast('No se pudo leer el código. Acércate más a la etiqueta.', 'error');
-    });
 }
 
 // ================= RECEPCIÓN =================
 async function enviarRecepcion() {
   const raw = document.getElementById('scannedList').value.trim();
-  if (!raw) return toast('Escanea al menos un serial', 'error');
+  if (!raw) return toast('Ingresa o escanea al menos un serial', 'error');
+  
   const equipos = raw.split('\n').map(line => {
-    const [serial, modelo] = line.split(',');
-    return { serial_pon: serial.trim(), modelo: (modelo || 'AX30-H').trim() };
+    const parts = line.split(',');
+    const serial = parts[0] ? parts[0].trim().toUpperCase() : '';
+    const modelo = parts[1] ? parts[1].trim().toUpperCase() : 'AX30-H';
+    return { serial_pon: serial, modelo: modelo || 'AX30-H' };
   }).filter(e => e.serial_pon);
 
+  if (!equipos.length) return toast('Sin seriales válidos', 'error');
+
   try {
+    toast('Guardando recepción...', 'info');
     const data = await apiPost('/equipos/recepcion', {
       equipos,
-      entrega: document.getElementById('recEntrega').value,
-      recibe: document.getElementById('recRecibe').value,
-      observaciones: document.getElementById('recObs').value
+      entrega: document.getElementById('recEntrega').value.trim(),
+      recibe: document.getElementById('recRecibe').value.trim(),
+      observaciones: document.getElementById('recObs').value.trim()
     });
-    toast(`Recepción ${data.id} guardada (${data.cantidad} equipos)`);
-    scanned = []; document.getElementById('scannedList').value = '';
-    document.getElementById('scanCount').textContent = '0';
+    toast(`✅ Recepción ${data.id || ''} guardada (${data.cantidad || equipos.length} equipos)`);
+    scanned = [];
+    document.getElementById('scannedList').value = '';
+    actualizarConteoLista();
   } catch (e) {
-    toast('Error: ' + e.message, 'error');
+    toast('Error guardando recepción: ' + (e.message || e), 'error');
   }
 }
 

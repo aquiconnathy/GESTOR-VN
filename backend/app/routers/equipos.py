@@ -14,7 +14,10 @@ settings = get_settings()
 async def next_seq(db: AsyncSession, key: str, prefix: str, pad: int = 3) -> str:
     stmt = select(ConfigSystem).where(ConfigSystem.key == key).with_for_update()
     res = await db.execute(stmt)
-    cfg = res.scalar_one()
+    cfg = res.scalar_one_or_none()
+    if not cfg:
+        cfg = ConfigSystem(key=key, value_int=0)
+        db.add(cfg)
     cfg.value_int += 1
     await db.commit()
     return f"{prefix}{str(cfg.value_int).zfill(pad)}"
@@ -36,17 +39,16 @@ async def recibir_equipos(data: RecepcionIn, db: AsyncSession = Depends(get_db))
 
     for item in data.equipos:
         serial = item.serial_pon.upper()
-        modelo = item.modelo.upper()
+        modelo = (item.modelo or "AX30-H").upper().strip()
         if serial in existentes:
             continue
-        if modelo == "AX30-H":
-            id_eq = await next_seq(db, "seq_eq_ax", "AX_", 3); cant_ax += 1
-        elif modelo == "V2801S-B":
-            id_eq = await next_seq(db, "seq_eq_onu", "ONU_", 3); cant_onu += 1
-        elif modelo == "AC1200":
-            id_eq = await next_seq(db, "seq_eq_ac", "AC_", 3); cant_ac += 1
-        else:
-            continue
+
+        seq_key = f"seq_eq_{modelo.lower().replace('-','_').replace(' ','_')}"
+        id_eq = await next_seq(db, seq_key, "EQ_", 3)
+        
+        if modelo == "AX30-H": cant_ax += 1
+        elif modelo == "V2801S-B": cant_onu += 1
+        elif modelo == "AC1200": cant_ac += 1
 
         password = serial[4:] if serial.startswith("VSOL") else ""
         eq = Equipo(

@@ -152,24 +152,56 @@
       <!-- RECEPCIÓN DE EQUIPOS -->
       <section id="view-recepcion" class="view">
         <div class="card">
-          <h2>📥 Recepción de Equipos (Escaneo masivo)</h2>
+          <h2>📥 Recepción de Equipos (Ingreso Masivo)</h2>
           
-          <div id="scanStatus" style="font-size:.85rem; text-align:center; color:var(--accent); margin-bottom:.5rem; min-height:1.2rem"></div>
-
-          <div class="scanner-box" id="reader"></div>
-          
-          <div class="grid-2" style="margin:.5rem 0">
-            <button type="button" class="btn" onclick="toggleScanner()">📷 Cámara en Vivo</button>
-            <button type="button" class="btn" onclick="document.getElementById('fileScanInput').click()">📸 Tomar Foto de Etiqueta</button>
+          <div class="grid-2" style="margin-bottom:1rem">
+            <div>
+              <label style="color:var(--accent); font-weight:700">Modelo de Equipos a Recibir *</label>
+              <select id="recModeloSelect" onchange="handleModeloChange(this)" style="font-size:1rem; border-color:var(--accent); font-weight:600">
+                <option value="AX30-H">AX30-H (VSOL)</option>
+                <option value="V2801S-B">V2801S-B (VSOL)</option>
+                <option value="AC1200">AC1200 (VSOL)</option>
+                <option value="V2804AX30-H">V2804AX30-H (VSOL)</option>
+                <option value="HG8145V5">HG8145V5 (Huawei)</option>
+                <option value="F670L">F670L (ZTE)</option>
+                <option value="__NEW__">➕ Añadir Nuevo Modelo...</option>
+              </select>
+            </div>
+            <div id="boxNuevoModelo" style="display:none">
+              <label style="color:var(--success); font-weight:700">Escribe el Nombre del Nuevo Modelo *</label>
+              <input type="text" id="recNuevoModeloInput" placeholder="Ej: EG8145V5, AN5506..." style="font-size:1rem; border-color:var(--success)">
+            </div>
           </div>
-          <input type="file" id="fileScanInput" accept="image/*" capture="environment" style="display:none" onchange="handleFileScan(event)">
 
-          <label style="margin-top:.8rem">Seriales Escaneados (<span id="scanCount">0</span>)</label>
-          <textarea id="scannedList" rows="4" placeholder="VSOL00E3E501,AX30-H..."></textarea>
-          <label>Entrega</label><input type="text" id="recEntrega" placeholder="Nombre quien entrega">
-          <label>Recibe</label><input type="text" id="recRecibe" placeholder="Nombre quien recibe">
-          <label>Observaciones</label><input type="text" id="recObs" placeholder="Opcional">
-          <button type="button" class="btn success" onclick="enviarRecepcion()">💾 Guardar Recepción</button>
+          <label style="color:var(--accent); font-weight:700">⚡ Entrada Rápida (Pistola Lector / Manual)</label>
+          <div style="display:flex; gap:.5rem; margin-bottom:1rem">
+            <input type="text" id="fastSerialInput" placeholder="Apunta con la pistola o escribe el serial..." onkeydown="handleFastInput(event)" autofocus style="flex:1; font-size:1rem; border-color:var(--accent)">
+            <button type="button" class="btn success" style="width:auto; padding:0 1rem; margin:0" onclick="agregarSerialManual()">+ Agregar</button>
+          </div>
+
+          <div style="margin-bottom:1rem">
+            <button type="button" class="btn" style="background:#334155; width:100%" onclick="toggleScanner()">📷 Usar Cámara del Teléfono</button>
+            <div id="scanStatus" style="font-size:.8rem; text-align:center; color:var(--accent); margin-top:.3rem"></div>
+            <div class="scanner-box" id="reader" style="display:none; margin-top:.5rem"></div>
+          </div>
+
+          <label>Lista de Seriales a Guardar (<span id="scanCount">0</span>)</label>
+          <textarea id="scannedList" rows="5" placeholder="Formato: SERIAL,MODELO&#10;VSOL00E3E501,AX30-H&#10;HWTC12345678,HG8145V5" oninput="actualizarConteoLista()"></textarea>
+          
+          <div class="grid-2">
+            <div>
+              <label>Entregado Por</label>
+              <input type="text" id="recEntrega" placeholder="Nombre quien entrega">
+            </div>
+            <div>
+              <label>Recibido Por</label>
+              <input type="text" id="recRecibe" placeholder="Nombre quien recibe">
+            </div>
+          </div>
+          <label>Observaciones</label>
+          <input type="text" id="recObs" placeholder="Opcional...">
+          
+          <button type="button" class="btn success" style="margin-top:1.2rem; font-size:1rem" onclick="enviarRecepcion()">💾 Confirmar y Guardar Recepción</button>
         </div>
       </section>
 

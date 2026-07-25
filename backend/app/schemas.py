@@ -4,9 +4,9 @@ from datetime import date, datetime
 
 # ---------- EQUIPOS ----------
 class EquipoIn(BaseModel):
-    serial_pon: str = Field(..., pattern=r"^VSOL[0-9A-F]{8}$")
-    modelo: str = Field(..., pattern=r"^(AX30-H|V2801S-B|AC1200)$")
-    marca: str = "VSOL"
+    serial_pon: str
+    modelo: str
+    marca: Optional[str] = "VSOL"
 
 class EquipoOut(EquipoIn):
     id: str
@@ -19,7 +19,7 @@ class EquipoOut(EquipoIn):
 # ---------- RECEPCIONES ----------
 class RecepcionItem(BaseModel):
     serial_pon: str
-    modelo: str
+    modelo: Optional[str] = "AX30-H"
 
 class RecepcionIn(BaseModel):
     equipos: List[RecepcionItem] = Field(..., min_length=1, max_length=100)
