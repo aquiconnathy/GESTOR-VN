@@ -39,7 +39,15 @@ async def login(data: LoginIn, db: AsyncSession = Depends(get_db)):
 
     user_id, nombre, email, db_pwd_hash, rol = row[0], row[1], row[2], row[3], row[4]
 
-    if db_pwd_hash != pwd_hash:
+    db_pwd_hash_clean = (str(db_pwd_hash) if db_pwd_hash else "").strip()
+    pwd_clean = data.password.strip()
+
+    is_valid = (
+        db_pwd_hash_clean.lower() == pwd_hash.lower() or
+        db_pwd_hash_clean == pwd_clean
+    )
+
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Contraseña incorrecta")
 
     token = f"token_{user_id}_{rol}"
