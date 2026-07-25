@@ -285,7 +285,7 @@ function playBeep() {
   } catch(e) {}
 }
 
-// ================= SCANNER =================
+// ================= SCANNER UNIVERSAL =================
 function toggleScanner() {
   const reader = document.getElementById('reader');
   if (html5QrCode) {
@@ -299,12 +299,18 @@ function toggleScanner() {
     return;
   }
 
+  // Habilitar TODOS los formatos de códigos de barras 1D y 2D
   const formatsToSupport = window.Html5QrcodeSupportedFormats ? [
     Html5QrcodeSupportedFormats.CODE_128,
     Html5QrcodeSupportedFormats.CODE_39,
+    Html5QrcodeSupportedFormats.CODE_93,
     Html5QrcodeSupportedFormats.EAN_13,
+    Html5QrcodeSupportedFormats.EAN_8,
     Html5QrcodeSupportedFormats.UPC_A,
-    Html5QrcodeSupportedFormats.QR_CODE
+    Html5QrcodeSupportedFormats.UPC_E,
+    Html5QrcodeSupportedFormats.ITF,
+    Html5QrcodeSupportedFormats.QR_CODE,
+    Html5QrcodeSupportedFormats.DATA_MATRIX
   ] : undefined;
 
   html5QrCode = new Html5Qrcode("reader", {
@@ -314,11 +320,11 @@ function toggleScanner() {
   });
 
   const config = {
-    fps: 20,
+    fps: 25,
     qrbox: (viewfinderWidth, viewfinderHeight) => {
       const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-      const width = Math.floor(viewfinderWidth * 0.85);
-      const height = Math.floor(minEdge * 0.35);
+      const width = Math.floor(viewfinderWidth * 0.90);
+      const height = Math.floor(minEdge * 0.40);
       return { width, height };
     },
     aspectRatio: 1.777778
@@ -333,32 +339,31 @@ function toggleScanner() {
   };
 
   const processText = (decodedText) => {
-    let raw = decodedText.trim().replace(/[\r\n\t]/g, '').toUpperCase();
-    let serial = null;
+    if (!decodedText) return;
+    
+    // Limpiar prefijos de etiquetas impresas ("S/N:", "PON S/N:", "SN:") y espacios
+    let raw = decodedText.trim()
+      .replace(/^(SN|S\/N|PON S\/N|PON|MAC):\s*/i, '')
+      .replace(/[\r\n\t\s]/g, '')
+      .toUpperCase();
 
-    // 1. Buscar patrón PON S/N (ej: VSOL00E3E501)
-    const vsolMatch = raw.match(/VSOL[0-9A-Z]{8}/);
-    if (vsolMatch) {
-      serial = vsolMatch[0];
-    } else {
-      // 2. Buscar cualquier código alfanumérico limpio de 10 a 16 caracteres
-      const cleanMatch = raw.match(/[0-9A-Z]{10,16}/);
-      if (cleanMatch) serial = cleanMatch[0];
-    }
-
-    if (serial && !scanned.includes(serial)) {
-      scanned.push(serial);
-      playBeep();
-      document.getElementById('scannedList').value = scanned.map(s => s + ',AX30-H').join('\n');
-      document.getElementById('scanCount').textContent = scanned.length;
-      toast('✅ Detectado: ' + serial);
+    // Aceptar cualquier código alfanumérico de cualquier marca (VSOL, Huawei, ZTE, Fiberhome, etc.)
+    if (/^[A-Z0-9\-\_]{4,32}$/.test(raw)) {
+      const serial = raw;
+      if (!scanned.includes(serial)) {
+        scanned.push(serial);
+        playBeep();
+        document.getElementById('scannedList').value = scanned.map(s => s + ',AX30-H').join('\n');
+        document.getElementById('scanCount').textContent = scanned.length;
+        toast('✅ Serial detectado: ' + serial);
+      }
     }
   };
 
   html5QrCode.start(cameraConfig, config, processText, () => {})
     .catch(() => {
-      // Fallback a configuración de cámara por defecto si 1080p falla en el teléfono
-      html5QrCode.start({ facingMode: "environment" }, { fps: 15 }, processText, () => {})
+      // Fallback a resolución por defecto si el teléfono no soporta 1080p
+      html5QrCode.start({ facingMode: "environment" }, { fps: 20 }, processText, () => {})
         .catch(err => toast('No se pudo abrir la cámara: ' + err, 'error'));
     });
 }
