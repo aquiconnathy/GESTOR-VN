@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, insert, func
+from sqlalchemy import select, insert, func, or_
 from typing import List
 from datetime import datetime
 from app.db import get_db
@@ -129,3 +129,21 @@ async def resumen_stock(db: AsyncSession = Depends(get_db)):
     for modelo, estado, cnt in res.all():
         data.setdefault(modelo, {})[estado] = cnt
     return data
+
+@router.get("/todos", response_model=List[EquipoOut])
+async def listar_todos_equipos(db: AsyncSession = Depends(get_db)):
+    stmt = select(Equipo).order_by(Equipo.created_at.desc())
+    res = await db.execute(stmt)
+    return [EquipoOut.model_validate(e) for e in res.scalars().all()]
+
+@router.delete("/{serial_o_id}")
+async def eliminar_equipo(serial_o_id: str, db: AsyncSession = Depends(get_db)):
+    sid = serial_o_id.upper().strip()
+    stmt = select(Equipo).where(or_(Equipo.id == sid, Equipo.serial_pon == sid))
+    res = await db.execute(stmt)
+    eq = res.scalar_one_or_none()
+    if not eq:
+        raise HTTPException(status_code=404, detail="Equipo no encontrado")
+    await db.delete(eq)
+    await db.commit()
+    return {"status": "success", "message": f"Equipo {sid} eliminado con éxito"}

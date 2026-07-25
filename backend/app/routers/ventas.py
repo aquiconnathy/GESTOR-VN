@@ -109,3 +109,19 @@ async def listar_ventas(db: AsyncSession = Depends(get_db)):
         return [VentaOut.model_validate(v) for v in res.scalars().all()]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al listar ventas: {str(e)}")
+
+@router.delete("/{id_venta}", response_model=MsgOut)
+async def eliminar_venta(id_venta: str, db: AsyncSession = Depends(get_db)):
+    target = id_venta.strip().upper()
+    stmt = select(Venta).where(Venta.id_venta == target)
+    res = await db.execute(stmt)
+    v = res.scalar_one_or_none()
+    if not v and target.isdigit():
+        stmt_id = select(Venta).where(Venta.id == int(target))
+        res_id = await db.execute(stmt_id)
+        v = res_id.scalar_one_or_none()
+    if not v:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    await db.delete(v)
+    await db.commit()
+    return MsgOut(status="success", message=f"Venta {id_venta} eliminada con éxito")

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import equipos, instalaciones, ventas, telegram, auth, dashboard
+from app.routers import equipos, instalaciones, ventas, telegram, auth, dashboard, config_admin, evaluacion
 
 app = FastAPI(
     title="UMSR API",
@@ -19,6 +19,8 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(dashboard.router)
+app.include_router(config_admin.router)
+app.include_router(evaluacion.router)
 app.include_router(equipos.router)
 app.include_router(instalaciones.router)
 app.include_router(ventas.router)

@@ -319,3 +319,15 @@ async def descargar_backup_xml(id_instalacion: str, db: AsyncSession = Depends(g
         media_type="application/xml",
         headers={"Content-Disposition": f'attachment; filename="{file_name}"'}
     )
+
+@router.delete("/{id_instalacion}", response_model=MsgOut)
+async def eliminar_instalacion(id_instalacion: str, db: AsyncSession = Depends(get_db)):
+    target = id_instalacion.strip().upper()
+    stmt = select(Instalacion).where(Instalacion.id == target)
+    res = await db.execute(stmt)
+    inst = res.scalar_one_or_none()
+    if not inst:
+        raise HTTPException(status_code=404, detail="Instalación no encontrada")
+    await db.delete(inst)
+    await db.commit()
+    return MsgOut(status="success", message=f"Instalación {target} eliminada con éxito")

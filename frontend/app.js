@@ -70,17 +70,17 @@ function applyRolePermissions() {
   
   // Mapa de visibilidad de pestañas según ROL
   const permissions = {
-    ADMIN: ['dashboard', 'ventas', 'recepcion', 'instalaciones', 'despacho', 'config'],
+    ADMIN: ['dashboard', 'ventas', 'recepcion', 'instalaciones', 'despacho', 'config', 'evaluacion', 'admin-config'],
     ASESOR: ['dashboard', 'ventas'],
-    ALMACEN: ['dashboard', 'recepcion', 'despacho'],
-    CONFIGURADOR: ['dashboard', 'config', 'instalaciones'],
+    ALMACEN: ['dashboard', 'recepcion', 'despacho', 'evaluacion'],
+    CONFIGURADOR: ['dashboard', 'config', 'instalaciones', 'evaluacion'],
     INSTALADOR: ['dashboard', 'instalaciones', 'despacho']
   };
 
   const allowedViews = permissions[rol] || ['dashboard', 'ventas'];
   
   // Mostrar/Ocultar botones del menú
-  ['dashboard', 'ventas', 'recepcion', 'instalaciones', 'despacho', 'config'].forEach(v => {
+  ['dashboard', 'ventas', 'recepcion', 'instalaciones', 'despacho', 'config', 'evaluacion', 'admin-config'].forEach(v => {
     const btn = document.getElementById('nav-' + v);
     if (btn) {
       btn.style.display = allowedViews.includes(v) ? 'inline-block' : 'none';
@@ -106,6 +106,8 @@ function showView(id) {
   if (id === 'dashboard') cargarEstadisticasDashboard();
   if (id === 'instalaciones') cargarPendientes();
   if (id === 'ventas') cargarVentas();
+  if (id === 'evaluacion') cargarEquiposEvaluacion();
+  if (id === 'admin-config') cargarConfiguracionSistemaAdmin();
 }
 
 // ================= DASHBOARD & TRAZABILIDAD =================
@@ -156,25 +158,25 @@ async function ejecutarTrazabilidad() {
     }
 
     if (data.equipos && data.equipos.length) {
-      html += `<h4 style="color:var(--accent); margin:1rem 0 .4rem 0">📦 Equipos Encontrados (${data.equipos.length})</h4><table><thead><tr><th>ID</th><th>Serial PON</th><th>Modelo</th><th>Estado</th><th>Recepción</th></tr></thead><tbody>`;
+      html += `<h4 style="color:var(--accent); margin:1rem 0 .4rem 0">📦 Equipos Encontrados (${data.equipos.length})</h4><table><thead><tr><th>ID</th><th>Serial PON</th><th>Modelo</th><th>Estado</th><th>Acción</th></tr></thead><tbody>`;
       data.equipos.forEach(e => {
-        html += `<tr><td><b>${e.id}</b></td><td><code>${e.serial_pon}</code></td><td>${e.modelo}</td><td><span class="badge ${e.estado.toLowerCase()}">${e.estado}</span></td><td>${e.id_recepcion||'-'}</td></tr>`;
+        html += `<tr><td><b>${e.id}</b></td><td><code>${e.serial_pon}</code></td><td>${e.modelo}</td><td><span class="badge ${e.estado.toLowerCase()}">${e.estado}</span></td><td><button class="btn danger" style="padding:.2rem .5rem; font-size:.75rem" onclick="eliminarEquipo('${e.id}')">🗑️ Borrar</button></td></tr>`;
       });
       html += '</tbody></table>';
     }
 
     if (data.ventas && data.ventas.length) {
-      html += `<h4 style="color:var(--accent); margin:1rem 0 .4rem 0">🛒 Ventas Encontradas (${data.ventas.length})</h4><table><thead><tr><th>ID Venta</th><th>Cliente</th><th>Cédula/RIF</th><th>Asesor</th><th>Estado Inst.</th></tr></thead><tbody>`;
+      html += `<h4 style="color:var(--accent); margin:1rem 0 .4rem 0">🛒 Ventas Encontradas (${data.ventas.length})</h4><table><thead><tr><th>ID Venta</th><th>Cliente</th><th>Cédula/RIF</th><th>Asesor</th><th>Acción</th></tr></thead><tbody>`;
       data.ventas.forEach(v => {
-        html += `<tr><td><b>${v.id_venta||'V_'+v.id}</b></td><td>${v.cliente}</td><td>${v.cedula_rif||'-'}</td><td>${v.asesor||'-'}</td><td><span class="badge ${(v.status_instalacion||'').toLowerCase()}">${v.status_instalacion||'-'}</span></td></tr>`;
+        html += `<tr><td><b>${v.id_venta||'V_'+v.id}</b></td><td>${v.cliente}</td><td>${v.cedula_rif||'-'}</td><td>${v.asesor||'-'}</td><td><button class="btn danger" style="padding:.2rem .5rem; font-size:.75rem" onclick="eliminarVenta('${v.id_venta||v.id}')">🗑️ Borrar</button></td></tr>`;
       });
       html += '</tbody></table>';
     }
 
     if (data.instalaciones && data.instalaciones.length) {
-      html += `<h4 style="color:var(--accent); margin:1rem 0 .4rem 0">📋 Instalaciones (${data.instalaciones.length})</h4><table><thead><tr><th>ID</th><th>Cliente</th><th>Nodo</th><th>Serial ONU</th><th>PPPoE</th><th>Estado</th></tr></thead><tbody>`;
+      html += `<h4 style="color:var(--accent); margin:1rem 0 .4rem 0">📋 Instalaciones (${data.instalaciones.length})</h4><table><thead><tr><th>ID</th><th>Cliente</th><th>Nodo</th><th>Serial ONU</th><th>Acción</th></tr></thead><tbody>`;
       data.instalaciones.forEach(i => {
-        html += `<tr><td><b>${i.id}</b></td><td>${i.cliente}</td><td>${i.nodo||'-'}</td><td><code>${i.serial_onu||'-'}</code></td><td>${i.pppoe||'-'}</td><td><span class="badge ${i.status.toLowerCase()}">${i.status}</span></td></tr>`;
+        html += `<tr><td><b>${i.id}</b></td><td>${i.cliente}</td><td>${i.nodo||'-'}</td><td><code>${i.serial_onu||'-'}</code></td><td><button class="btn danger" style="padding:.2rem .5rem; font-size:.75rem" onclick="eliminarInstalacion('${i.id}')">🗑️ Borrar</button></td></tr>`;
       });
       html += '</tbody></table>';
     }
@@ -240,6 +242,50 @@ async function apiGet(path) {
   }
   const res = await fetch(`${API_URL}${path}`, { headers });
   return res.json();
+}
+
+async function apiDelete(path) {
+  const headers = {};
+  if (currentUser && currentUser.token) {
+    headers['Authorization'] = `Bearer ${currentUser.token}`;
+  }
+  const res = await fetch(`${API_URL}${path}`, { method: 'DELETE', headers });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || data.message || 'Error al eliminar');
+  return data;
+}
+
+async function eliminarVenta(idVenta) {
+  if (!confirm(`¿Seguro que deseas eliminar la venta ${idVenta}?`)) return;
+  try {
+    const res = await apiDelete(`/ventas/${idVenta}`);
+    toast('✅ Venta eliminada con éxito');
+    cargarVentas();
+  } catch (err) {
+    toast('Error eliminando venta: ' + err.message, 'error');
+  }
+}
+
+async function eliminarEquipo(idEquipo) {
+  if (!confirm(`¿Seguro que deseas eliminar el equipo ${idEquipo}?`)) return;
+  try {
+    const res = await apiDelete(`/equipos/${idEquipo}`);
+    toast('✅ Equipo eliminado con éxito');
+    cargarEstadisticasDashboard();
+  } catch (err) {
+    toast('Error eliminando equipo: ' + err.message, 'error');
+  }
+}
+
+async function eliminarInstalacion(idInstalacion) {
+  if (!confirm(`¿Seguro que deseas eliminar la instalación ${idInstalacion}?`)) return;
+  try {
+    const res = await apiDelete(`/instalaciones/${idInstalacion}`);
+    toast('✅ Instalación eliminada con éxito');
+    cargarPendientes();
+  } catch (err) {
+    toast('Error eliminando instalación: ' + err.message, 'error');
+  }
 }
 
 // ================= OFFLINE QUEUE =================
@@ -342,11 +388,13 @@ function renderTablaVentas(ventas) {
         <th>Plan</th>
         <th>Nodo</th>
         <th>Estado Instalación</th>
+        <th>Acción</th>
       </tr>
     </thead>
     <tbody>`;
   ventas.forEach(v => {
     const badgeClass = (v.status_instalacion || 'PENDIENTE_ASIGNAR').toLowerCase().replace('_', '');
+    const idVta = v.id_venta || v.id;
     html += `<tr>
       <td><b>${v.id_venta || 'V_'+v.id}</b></td>
       <td>${v.nombre_cliente}</td>
@@ -354,6 +402,7 @@ function renderTablaVentas(ventas) {
       <td>${v.plan_servicio || '-'}</td>
       <td>${v.nodo || '-'}</td>
       <td><span class="badge ${badgeClass}">${v.status_instalacion || 'PENDIENTE'}</span></td>
+      <td><button class="btn danger" style="padding:.2rem .5rem; font-size:.75rem" onclick="eliminarVenta('${idVta}')">🗑️ Borrar</button></td>
     </tr>`;
   });
   html += '</tbody></table>';
@@ -849,4 +898,207 @@ async function confirmarEETLCampo(idInst) {
 // ================= SERVICE WORKER =================
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(console.error);
+}
+
+// ================= EVALUACIÓN & TALLER TÉCNICO =================
+async function handleIngresarEvaluacion(e) {
+  e.preventDefault();
+  const serial = document.getElementById('evSerial').value.trim();
+  const modelo = document.getElementById('evModelo').value.trim();
+  const motivo = document.getElementById('evMotivo').value;
+  const cliente = document.getElementById('evCliente').value.trim();
+  const obs = document.getElementById('evObs').value.trim();
+
+  if (!serial || !modelo) return toast('Serial y Modelo son obligatorios', 'error');
+
+  try {
+    toast('Registrando ingreso a evaluación...', 'info');
+    const res = await apiPost('/evaluacion/ingresar', {
+      serial_pon: serial.toUpperCase(),
+      modelo: modelo.toUpperCase(),
+      motivo: motivo,
+      nombre_cliente: cliente,
+      observaciones: obs,
+      tecnico: currentUser ? currentUser.nombre : 'Técnico Taller'
+    });
+    toast(`✅ ${res.message}`);
+    document.getElementById('evSerial').value = '';
+    document.getElementById('evObs').value = '';
+    cargarEquiposEvaluacion();
+  } catch (err) {
+    toast('Error ingresando equipo: ' + err.message, 'error');
+  }
+}
+
+async function cargarEquiposEvaluacion() {
+  const container = document.getElementById('listaEquiposEvaluacion');
+  if (!container) return;
+  container.innerHTML = '<p style="color:var(--muted)">Cargando laboratorio...</p>';
+
+  try {
+    const data = await apiGet('/evaluacion/listar');
+    if (!data || !data.length) {
+      container.innerHTML = '<p style="color:var(--muted)">Sin equipos actualmente en evaluación o taller.</p>';
+      return;
+    }
+
+    let html = '<table><thead><tr><th>Serial PON</th><th>Modelo</th><th>Estado / Motivo</th><th>Observaciones</th><th>Dictamen Técnico</th></tr></thead><tbody>';
+    data.forEach(e => {
+      html += `<tr>
+        <td><b><code>${e.serial_pon}</code></b></td>
+        <td>${e.modelo}</td>
+        <td><span class="badge enruta">${e.estado}</span></td>
+        <td>${e.observaciones || '-'}</td>
+        <td>
+          <div style="display:flex; gap:.3rem">
+            <button type="button" class="btn success" style="padding:.2rem .5rem; font-size:.75rem; width:auto; margin:0" onclick="dictamenEvaluacion('${e.serial_pon}', 'REINTEGRO_INVENTARIO')">🔄 Reintegrar Stock</button>
+            <button type="button" class="btn danger" style="padding:.2rem .5rem; font-size:.75rem; width:auto; margin:0" onclick="dictamenEvaluacion('${e.serial_pon}', 'DESCARTE')">🗑️ Descarte</button>
+          </div>
+        </td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = '<p style="color:var(--danger)">Error al cargar equipos de evaluación</p>';
+  }
+}
+
+async function dictamenEvaluacion(serial, opcion) {
+  const nota = prompt(`Dictamen para el equipo ${serial} (${opcion}):\nEscribe notas del diagnóstico:`, 'Evaluación completada con éxito');
+  if (nota === null) return;
+
+  try {
+    toast('Aplicando dictamen...', 'info');
+    const res = await apiPost('/evaluacion/dictamen', {
+      serial_pon: serial,
+      dictamen: opcion,
+      observaciones: nota
+    });
+    toast(`✅ ${res.message}`);
+    cargarEquiposEvaluacion();
+    cargarEstadisticasDashboard();
+  } catch (err) {
+    toast('Error en dictamen: ' + err.message, 'error');
+  }
+}
+
+// ================= PANEL CONFIGURACIÓN GENERAL ADMIN =================
+let adminSettingsCache = {
+  nodos: ["NODO CENTRO", "NODO NORTE", "NODO SUR", "NODO ESTE", "NODO OESTE"],
+  promociones: [
+    { nombre: "ESTÁNDAR", pasa_por_config: true },
+    { nombre: "ESTE ES TU LUGAR", pasa_por_config: true },
+    { nombre: "PROMO 50% DESCUENTO", pasa_por_config: true }
+  ],
+  metodos_pago: ["PAGO MÓVIL", "ZELLE", "TRANSFERENCIA BANCARIA", "EFECTIVO USD", "USDT BINANCE"],
+  modelos_equipos: ["AX30-H", "V2801S-B", "AC1200", "WK-3801"]
+};
+
+async function cargarConfiguracionSistemaAdmin() {
+  try {
+    const data = await apiGet('/admin/settings');
+    if (data) adminSettingsCache = data;
+    renderAdminSettingsUI();
+  } catch (e) {
+    console.error('Error cargando admin settings:', e);
+    renderAdminSettingsUI();
+  }
+}
+
+function renderAdminSettingsUI() {
+  const containerNodos = document.getElementById('adminListaNodos');
+  if (containerNodos) {
+    let html = '';
+    (adminSettingsCache.nodos || []).forEach((n, idx) => {
+      html += `<span class="badge" style="background:#334155; font-size:.85rem; padding:.3rem .6rem">${n} <b style="cursor:pointer; color:#ef4444; margin-left:.4rem" onclick="eliminarNodoAdmin(${idx})">×</b></span>`;
+    });
+    containerNodos.innerHTML = html || '<p style="color:var(--muted)">Sin nodos configurados</p>';
+  }
+
+  const containerPromos = document.getElementById('adminListaPromos');
+  if (containerPromos) {
+    let html = '';
+    (adminSettingsCache.promociones || []).forEach((p, idx) => {
+      const pNom = typeof p === 'string' ? p : p.nombre;
+      const pReq = typeof p === 'string' ? true : p.pasa_por_config;
+      html += `<div style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; padding:.4rem .8rem; border-radius:.4rem">
+        <span><b>${pNom}</b> ${pReq ? '<span class="badge enruta">Pasa por Config</span>' : '<span class="badge eetl">Directo a Campo</span>'}</span>
+        <button type="button" class="btn danger" style="padding:.2rem .5rem; font-size:.75rem; width:auto; margin:0" onclick="eliminarPromoAdmin(${idx})">Eliminar</button>
+      </div>`;
+    });
+    containerPromos.innerHTML = html || '<p style="color:var(--muted)">Sin promociones configuradas</p>';
+  }
+
+  const containerPagos = document.getElementById('adminListaMetodosPago');
+  if (containerPagos) {
+    let html = '';
+    (adminSettingsCache.metodos_pago || []).forEach((m, idx) => {
+      html += `<span class="badge" style="background:#065f46; font-size:.85rem; padding:.3rem .6rem">${m} <b style="cursor:pointer; color:#ef4444; margin-left:.4rem" onclick="eliminarMetodoPagoAdmin(${idx})">×</b></span>`;
+    });
+    containerPagos.innerHTML = html || '<p style="color:var(--muted)">Sin métodos de pago configurados</p>';
+  }
+}
+
+function agregarNodoAdmin() {
+  const val = document.getElementById('adminNuevoNodo').value.trim().toUpperCase();
+  if (!val) return;
+  if (!adminSettingsCache.nodos.includes(val)) {
+    adminSettingsCache.nodos.push(val);
+    renderAdminSettingsUI();
+  }
+  document.getElementById('adminNuevoNodo').value = '';
+}
+
+function eliminarNodoAdmin(idx) {
+  adminSettingsCache.nodos.splice(idx, 1);
+  renderAdminSettingsUI();
+}
+
+function agregarPromoAdmin() {
+  const val = document.getElementById('adminNuevaPromo').value.trim().toUpperCase();
+  const req = document.getElementById('adminPromoRequiereConfig').checked;
+  if (!val) return;
+  adminSettingsCache.promociones.push({ nombre: val, pasa_por_config: req });
+  renderAdminSettingsUI();
+  document.getElementById('adminNuevaPromo').value = '';
+}
+
+function eliminarPromoAdmin(idx) {
+  adminSettingsCache.promociones.splice(idx, 1);
+  renderAdminSettingsUI();
+}
+
+function agregarMetodoPagoAdmin() {
+  const val = document.getElementById('adminNuevoMetodoPago').value.trim().toUpperCase();
+  if (!val) return;
+  if (!adminSettingsCache.metodos_pago.includes(val)) {
+    adminSettingsCache.metodos_pago.push(val);
+    renderAdminSettingsUI();
+  }
+  document.getElementById('adminNuevoMetodoPago').value = '';
+}
+
+function eliminarMetodoPagoAdmin(idx) {
+  adminSettingsCache.metodos_pago.splice(idx, 1);
+  renderAdminSettingsUI();
+}
+
+async function guardarConfiguracionSistemaAdmin() {
+  try {
+    toast('Guardando ajustes del sistema...', 'info');
+    const res = await apiPost('/admin/settings', adminSettingsCache);
+    toast('✅ Ajustes del sistema guardados en la base de datos');
+  } catch (err) {
+    toast('Error guardando ajustes: ' + err.message, 'error');
+  }
+}
+
+function exportarDataCSV() {
+  window.open(`${API_URL}/equipos/stock`, '_blank');
+}
+
+function generarReportePDF(depto) {
+  toast(`📄 Generando reporte PDF de ${depto.toUpperCase()}...`);
+  window.print();
 }
