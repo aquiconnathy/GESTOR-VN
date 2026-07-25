@@ -472,11 +472,56 @@
         <div class="card">
           <h2>⚙️ Panel de Configuración General del Sistema (ADMIN)</h2>
 
-          <!-- REORDENADOR DE PESTAÑAS -->
+          <!-- REORDENADOR DE PESTAÑAS ARRISTRABLE -->
           <div style="background:#182232; padding:.8rem; border-radius:.5rem; margin-bottom:1.2rem; border:1px solid #3b82f6">
-            <h3 style="color:#3b82f6; margin:0 0 .5rem 0">📱 Orden de Pestañas del Menú para Todos los Usuarios</h3>
-            <p style="font-size:.8rem; color:var(--muted); margin-bottom:.5rem">Usa las flechas ⬆️ ⬇️ para cambiar la posición de cada vista en el menú lateral:</p>
+            <h3 style="color:#3b82f6; margin:0 0 .5rem 0">📱 Orden de Pestañas del Menú (Arrastrar y Soltar)</h3>
+            <p style="font-size:.8rem; color:var(--muted); margin-bottom:.75rem">Mantén presionado y <b>arrastra</b> cada elemento hacia arriba o abajo para organizar el menú lateral. Haz clic en <b>Guardar Ajustes Globales</b> para aplicar los cambios:</p>
             <div id="adminListaMenuOrden" style="display:flex; flex-direction:column; gap:.4rem"></div>
+          </div>
+
+          <!-- GESTIÓN DE USUARIOS, ROLES Y CREDENCIALES -->
+          <div style="background:#182232; padding:1rem; border-radius:.5rem; margin-bottom:1.2rem; border:1px solid #8b5cf6">
+            <h3 style="color:#8b5cf6; margin:0 0 .5rem 0">👥 Gestión de Usuarios, Roles y Credenciales de Acceso</h3>
+            <p style="font-size:.8rem; color:var(--muted); margin-bottom:1rem">Crea nuevos usuarios, asigna roles (`ADMIN`, `ASESOR`, `ALMACEN`, `CONFIGURADOR`, `INSTALADOR`) o restablece contraseñas:</p>
+
+            <form onsubmit="handleCrearUsuarioAdmin(event)" style="background:#0f172a; padding:.8rem; border-radius:.5rem; margin-bottom:1rem">
+              <span style="font-size:.85rem; font-weight:700; color:var(--accent)">➕ Crear Nuevo Usuario</span>
+              <div class="grid-2" style="margin-top:.5rem">
+                <div>
+                  <label>Nombre Completo *</label>
+                  <input type="text" id="userNuevoNombre" placeholder="Ej: Pedro Pérez" required>
+                </div>
+                <div>
+                  <label>Correo Electrónico (Login) *</label>
+                  <input type="email" id="userNuevoEmail" placeholder="pedro@empresa.com" required>
+                </div>
+              </div>
+
+              <div class="grid-2">
+                <div>
+                  <label>Contraseña Inicial *</label>
+                  <input type="password" id="userNuevoPass" placeholder="******" required>
+                </div>
+                <div>
+                  <label>Rol y Permisos de Acceso *</label>
+                  <select id="userNuevoRol" required style="font-weight:700; color:var(--accent)">
+                    <option value="ADMIN">👑 ADMIN (Acceso Total)</option>
+                    <option value="ASESOR">🛒 ASESOR (Ventas)</option>
+                    <option value="ALMACEN">📥 ALMACEN (Stock / Despacho)</option>
+                    <option value="CONFIGURADOR">⚙️ CONFIGURADOR (UMSR)</option>
+                    <option value="INSTALADOR">🚚 INSTALADOR (Campo)</option>
+                  </select>
+                </div>
+              </div>
+
+              <button type="submit" class="btn success" style="margin-top:.75rem">👤 Crear Usuario y Credenciales</button>
+            </form>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.5rem">
+              <span style="font-size:.9rem; font-weight:700">Usuarios Registrados en el Sistema</span>
+              <button type="button" class="btn" style="width:auto; padding:.2rem .6rem; font-size:.75rem" onclick="cargarUsuariosAdmin()">🔄 Actualizar Lista</button>
+            </div>
+            <div id="adminListaUsuarios" style="overflow-x:auto"></div>
           </div>
           
           <!-- PLANES DE SERVICIO -->

@@ -64,9 +64,8 @@ function handleLogout() {
   checkAuth();
 }
 
-function applyRolePermissions() {
-  if (!currentUser) return;
-  const rol = currentUser.rol;
+function applyRolePermissions(rol, switchTab = false) {
+  if (!rol) return;
   
   // Mapa de visibilidad de pestañas según ROL
   const permissions = {
@@ -93,9 +92,11 @@ function applyRolePermissions() {
     });
   }
 
-  // Activar primera pestaña disponible
-  const firstAllowed = savedOrder.find(v => allowedViews.includes(v)) || allowedViews[0];
-  if (firstAllowed) showView(firstAllowed);
+  // Solo cambiar de pestaña si switchTab es true (ej: al hacer Login)
+  if (switchTab) {
+    const firstAllowed = savedOrder.find(v => allowedViews.includes(v)) || allowedViews[0];
+    if (firstAllowed) showView(firstAllowed);
+  }
 }
 
 // ================= SIDEBAR DESPLEGABLE =================
@@ -1023,14 +1024,31 @@ let adminSettingsCache = {
   modelos_equipos: ["AX30-H", "V2801S-B", "AC1200", "WK-3801"]
 };
 
+async function apiPut(path, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (currentUser && currentUser.token) {
+    headers['Authorization'] = `Bearer ${currentUser.token}`;
+  }
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || data.message || 'Error en servidor');
+  return data;
+}
+
 async function cargarConfiguracionSistemaAdmin() {
   try {
     const data = await apiGet('/admin/settings');
     if (data) adminSettingsCache = data;
     renderAdminSettingsUI();
+    cargarUsuariosAdmin();
   } catch (e) {
     console.error('Error cargando admin settings:', e);
     renderAdminSettingsUI();
+    cargarUsuariosAdmin();
   }
 }
 
@@ -1045,24 +1063,66 @@ const ALL_TABS_MAP = {
   'admin-config': '⚙️ Config Admin'
 };
 
-function renderAdminSettingsUI() {
-  // Reordenar Menú UI
-  const containerMenu = document.getElementById('adminListaMenuOrden');
-  if (containerMenu) {
-    let html = '';
-    const tabs = adminSettingsCache.menu_orden || ['dashboard', 'ventas', 'recepcion', 'instalaciones', 'despacho', 'config', 'evaluacion', 'admin-config'];
-    tabs.forEach((tabId, idx) => {
-      const label = ALL_TABS_MAP[tabId] || tabId;
-      html += `<div style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; padding:.4rem .8rem; border-radius:.4rem">
-        <span><b>${label}</b></span>
-        <div style="display:flex; gap:.3rem">
-          <button type="button" class="btn" style="padding:.25rem .6rem; font-size:.8rem; width:auto; margin:0; background:#334155" onclick="moverPestanaMenu(${idx}, -1)" ${idx === 0 ? 'disabled' : ''}>⬆️ Subir</button>
-          <button type="button" class="btn" style="padding:.25rem .6rem; font-size:.8rem; width:auto; margin:0; background:#334155" onclick="moverPestanaMenu(${idx}, 1)" ${idx === tabs.length - 1 ? 'disabled' : ''}>⬇️ Bajar</button>
-        </div>
-      </div>`;
-    });
-    containerMenu.innerHTML = html;
+let dragSourceIdxMenu = null;
+
+function handleDragStartMenu(e, idx) {
+  dragSourceIdxMenu = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.style.opacity = '0.4';
+}
+
+function handleDragOverMenu(e) {
+  if (e.preventDefault) e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  return false;
+}
+
+function handleDropMenu(e, targetIdx) {
+  if (e.stopPropagation) e.stopPropagation();
+  if (dragSourceIdxMenu !== null && dragSourceIdxMenu !== targetIdx) {
+    if (!adminSettingsCache.menu_orden) {
+      adminSettingsCache.menu_orden = ['dashboard', 'ventas', 'recepcion', 'instalaciones', 'despacho', 'config', 'evaluacion', 'admin-config'];
+    }
+    const movedItem = adminSettingsCache.menu_orden.splice(dragSourceIdxMenu, 1)[0];
+    adminSettingsCache.menu_orden.splice(targetIdx, 0, movedItem);
+    renderMenuOrdenUI();
   }
+  return false;
+}
+
+function handleDragEndMenu(e) {
+  e.currentTarget.style.opacity = '1';
+  dragSourceIdxMenu = null;
+}
+
+function renderMenuOrdenUI() {
+  const containerMenu = document.getElementById('adminListaMenuOrden');
+  if (!containerMenu) return;
+  let html = '';
+  const tabs = adminSettingsCache.menu_orden || ['dashboard', 'ventas', 'recepcion', 'instalaciones', 'despacho', 'config', 'evaluacion', 'admin-config'];
+  tabs.forEach((tabId, idx) => {
+    const label = ALL_TABS_MAP[tabId] || tabId;
+    html += `<div draggable="true" 
+                  ondragstart="handleDragStartMenu(event, ${idx})" 
+                  ondragover="handleDragOverMenu(event)" 
+                  ondrop="handleDropMenu(event, ${idx})" 
+                  ondragend="handleDragEndMenu(event)"
+                  style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; padding:.5rem .8rem; border-radius:.4rem; border:1px solid #334155; cursor:grab; user-select:none">
+      <span style="display:flex; align-items:center; gap:.5rem">
+        <span style="color:var(--muted); font-size:1.1rem">☰</span>
+        <b>${label}</b>
+      </span>
+      <div style="display:flex; gap:.3rem; align-items:center">
+        <button type="button" class="btn" style="padding:.15rem .4rem; font-size:.75rem; width:auto; margin:0; background:#334155" onclick="moverPestanaMenu(${idx}, -1)" ${idx === 0 ? 'disabled' : ''}>⬆️</button>
+        <button type="button" class="btn" style="padding:.15rem .4rem; font-size:.75rem; width:auto; margin:0; background:#334155" onclick="moverPestanaMenu(${idx}, 1)" ${idx === tabs.length - 1 ? 'disabled' : ''}>⬇️</button>
+      </div>
+    </div>`;
+  });
+  containerMenu.innerHTML = html;
+}
+
+function renderAdminSettingsUI() {
+  renderMenuOrdenUI();
 
   // Planes UI
   const containerPlanes = document.getElementById('adminListaPlanes');
@@ -1116,8 +1176,7 @@ function moverPestanaMenu(idx, dir) {
   const temp = adminSettingsCache.menu_orden[idx];
   adminSettingsCache.menu_orden[idx] = adminSettingsCache.menu_orden[targetIdx];
   adminSettingsCache.menu_orden[targetIdx] = temp;
-  renderAdminSettingsUI();
-  if (currentUser) applyRolePermissions(currentUser.rol);
+  renderMenuOrdenUI(); // Solo actualiza el borrador local sin redirigir de pantalla!
 }
 
 function agregarPlanAdmin() {
@@ -1187,6 +1246,8 @@ async function guardarConfiguracionSistemaAdmin() {
     toast('Guardando ajustes del sistema...', 'info');
     const res = await apiPost('/admin/settings', adminSettingsCache);
     toast('✅ Ajustes del sistema guardados en la base de datos');
+    // Aplicar el nuevo orden al sidebar sin cambiar de vista ni redirigir
+    if (currentUser) applyRolePermissions(currentUser.rol, false);
   } catch (err) {
     toast('Error guardando ajustes: ' + err.message, 'error');
   }
@@ -1199,4 +1260,98 @@ function exportarDataCSV() {
 function generarReportePDF(depto) {
   toast(`📄 Generando reporte PDF de ${depto.toUpperCase()}...`);
   window.print();
+}
+
+// ================= GESTIÓN DE USUARIOS Y ROLES (ADMIN) =================
+async function cargarUsuariosAdmin() {
+  const container = document.getElementById('adminListaUsuarios');
+  if (!container) return;
+  container.innerHTML = '<p style="color:var(--muted)">Cargando usuarios...</p>';
+  try {
+    const usuarios = await apiGet('/auth/usuarios');
+    if (!usuarios || !usuarios.length) {
+      container.innerHTML = '<p style="color:var(--muted)">No hay usuarios registrados.</p>';
+      return;
+    }
+
+    let html = '<table><thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Acciones</th></tr></thead><tbody>';
+    usuarios.forEach(u => {
+      html += `<tr>
+        <td><b>${u.nombre}</b></td>
+        <td>${u.email}</td>
+        <td>
+          <select onchange="editarRolUsuarioAdmin('${u.id}', this.value)" style="padding:.2rem .4rem; font-size:.8rem; font-weight:700; border-color:var(--accent)">
+            <option value="ADMIN" ${u.rol === 'ADMIN' ? 'selected' : ''}>ADMIN</option>
+            <option value="ASESOR" ${u.rol === 'ASESOR' ? 'selected' : ''}>ASESOR</option>
+            <option value="ALMACEN" ${u.rol === 'ALMACEN' ? 'selected' : ''}>ALMACEN</option>
+            <option value="CONFIGURADOR" ${u.rol === 'CONFIGURADOR' ? 'selected' : ''}>CONFIGURADOR</option>
+            <option value="INSTALADOR" ${u.rol === 'INSTALADOR' ? 'selected' : ''}>INSTALADOR</option>
+          </select>
+        </td>
+        <td>
+          <div style="display:flex; gap:.3rem">
+            <button type="button" class="btn" style="padding:.2rem .5rem; font-size:.75rem; width:auto; margin:0" onclick="cambiarPasswordUsuarioAdmin('${u.id}', '${u.nombre}')">🔑 Clave</button>
+            <button type="button" class="btn danger" style="padding:.2rem .5rem; font-size:.75rem; width:auto; margin:0" onclick="eliminarUsuarioAdmin('${u.id}', '${u.nombre}')">🗑️ Borrar</button>
+          </div>
+        </td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = '<p style="color:var(--danger)">Error al obtener lista de usuarios</p>';
+  }
+}
+
+async function handleCrearUsuarioAdmin(e) {
+  e.preventDefault();
+  const nombre = document.getElementById('userNuevoNombre').value.trim();
+  const email = document.getElementById('userNuevoEmail').value.trim();
+  const password = document.getElementById('userNuevoPass').value.trim();
+  const rol = document.getElementById('userNuevoRol').value;
+
+  if (!nombre || !email || !password) return toast('Completa todos los campos obligatorios', 'error');
+
+  try {
+    toast('Creando usuario...', 'info');
+    const res = await apiPost('/auth/usuarios', { nombre, email, password, rol });
+    toast(`✅ ${res.message}`);
+    document.getElementById('userNuevoNombre').value = '';
+    document.getElementById('userNuevoEmail').value = '';
+    document.getElementById('userNuevoPass').value = '';
+    cargarUsuariosAdmin();
+  } catch (err) {
+    toast('Error creando usuario: ' + err.message, 'error');
+  }
+}
+
+async function editarRolUsuarioAdmin(userId, nuevoRol) {
+  try {
+    const res = await apiPut(`/auth/usuarios/${userId}`, { rol: nuevoRol });
+    toast(`✅ Rol actualizado a ${nuevoRol}`);
+  } catch (err) {
+    toast('Error actualizando rol: ' + err.message, 'error');
+  }
+}
+
+async function cambiarPasswordUsuarioAdmin(userId, nombre) {
+  const newPass = prompt(`Escribe la nueva contraseña para ${nombre}:`);
+  if (!newPass) return;
+  try {
+    const res = await apiPut(`/auth/usuarios/${userId}`, { password: newPass });
+    toast(`✅ Contraseña actualizada para ${nombre}`);
+  } catch (err) {
+    toast('Error cambiando contraseña: ' + err.message, 'error');
+  }
+}
+
+async function eliminarUsuarioAdmin(userId, nombre) {
+  if (!confirm(`¿Seguro que deseas eliminar al usuario ${nombre}?`)) return;
+  try {
+    const res = await apiDelete(`/auth/usuarios/${userId}`);
+    toast(`✅ Usuario ${nombre} eliminado`);
+    cargarUsuariosAdmin();
+  } catch (err) {
+    toast('Error eliminando usuario: ' + err.message, 'error');
+  }
 }
