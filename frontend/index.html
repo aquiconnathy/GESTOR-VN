@@ -56,7 +56,8 @@
     </header>
 
     <nav id="mainNav">
-      <button id="nav-ventas" class="active" onclick="showView('ventas')">🛒 Ventas</button>
+      <button id="nav-dashboard" class="active" onclick="showView('dashboard')">📊 Dashboard</button>
+      <button id="nav-ventas" onclick="showView('ventas')">🛒 Ventas</button>
       <button id="nav-recepcion" onclick="showView('recepcion')">📥 Recepción</button>
       <button id="nav-instalaciones" onclick="showView('instalaciones')">📋 Instalaciones</button>
       <button id="nav-despacho" onclick="showView('despacho')">🚚 Despacho</button>
@@ -64,6 +65,41 @@
     </nav>
 
     <main>
+      <!-- DASHBOARD & TRAZABILIDAD -->
+      <section id="view-dashboard" class="view active">
+        <div class="grid-3" style="margin-bottom:1rem">
+          <div class="card" style="margin:0; text-align:center; padding:.8rem">
+            <span style="font-size:.8rem; color:var(--muted)">Stock Disponible</span>
+            <h3 id="statStock" style="font-size:1.6rem; color:var(--success); margin-top:.2rem">0</h3>
+          </div>
+          <div class="card" style="margin:0; text-align:center; padding:.8rem">
+            <span style="font-size:.8rem; color:var(--muted)">Ventas Totales</span>
+            <h3 id="statVentas" style="font-size:1.6rem; color:var(--accent); margin-top:.2rem">0</h3>
+          </div>
+          <div class="card" style="margin:0; text-align:center; padding:.8rem">
+            <span style="font-size:.8rem; color:var(--muted)">Instalaciones Pendientes</span>
+            <h3 id="statInstPend" style="font-size:1.6rem; color:#f59e0b; margin-top:.2rem">0</h3>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>🔎 Buscador de Trazabilidad Unificada</h2>
+          <p style="font-size:.85rem; color:var(--muted); margin-bottom:.75rem">Rastrea la historia completa por Serial PON, Cédula/RIF, Cliente o ID de Instalación:</p>
+          <div style="display:flex; gap:.5rem">
+            <input type="text" id="traceSearchInput" placeholder="Ej: VSOL00E3E501, 12345678, Juan Pérez, INS_001..." onkeydown="if(event.key==='Enter') ejecutarTrazabilidad()" style="flex:1; font-size:1rem">
+            <button class="btn success" style="width:auto; padding:0 1.2rem; margin:0" onclick="ejecutarTrazabilidad()">Buscar</button>
+          </div>
+          <div id="traceResults" style="margin-top:1rem"></div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.5rem">
+            <h2>📦 Inventario de Stock por Modelo</h2>
+            <button class="btn" style="width:auto; padding:.3rem .7rem; font-size:.8rem" onclick="cargarEstadisticasDashboard()">🔄 Actualizar</button>
+          </div>
+          <div id="stockModelosTable"></div>
+        </div>
+      </section>
       <!-- REGISTRO Y HISTORIAL DE VENTAS -->
       <section id="view-ventas" class="view active">
         <div class="card">

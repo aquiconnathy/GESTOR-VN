@@ -70,17 +70,17 @@ function applyRolePermissions() {
   
   // Mapa de visibilidad de pestañas según ROL
   const permissions = {
-    ADMIN: ['ventas', 'recepcion', 'instalaciones', 'despacho', 'config'],
-    ASESOR: ['ventas'],
-    ALMACEN: ['recepcion', 'despacho'],
-    CONFIGURADOR: ['config', 'instalaciones'],
-    INSTALADOR: ['instalaciones', 'despacho']
+    ADMIN: ['dashboard', 'ventas', 'recepcion', 'instalaciones', 'despacho', 'config'],
+    ASESOR: ['dashboard', 'ventas'],
+    ALMACEN: ['dashboard', 'recepcion', 'despacho'],
+    CONFIGURADOR: ['dashboard', 'config', 'instalaciones'],
+    INSTALADOR: ['dashboard', 'instalaciones', 'despacho']
   };
 
-  const allowedViews = permissions[rol] || ['ventas'];
+  const allowedViews = permissions[rol] || ['dashboard', 'ventas'];
   
   // Mostrar/Ocultar botones del menú
-  ['ventas', 'recepcion', 'instalaciones', 'despacho', 'config'].forEach(v => {
+  ['dashboard', 'ventas', 'recepcion', 'instalaciones', 'despacho', 'config'].forEach(v => {
     const btn = document.getElementById('nav-' + v);
     if (btn) {
       btn.style.display = allowedViews.includes(v) ? 'inline-block' : 'none';
@@ -103,8 +103,95 @@ function showView(id) {
   const targetNav = document.getElementById('nav-' + id);
   if (targetNav) targetNav.classList.add('active');
 
+  if (id === 'dashboard') cargarEstadisticasDashboard();
   if (id === 'instalaciones') cargarPendientes();
   if (id === 'ventas') cargarVentas();
+}
+
+// ================= DASHBOARD & TRAZABILIDAD =================
+async function cargarEstadisticasDashboard() {
+  try {
+    const data = await apiGet('/dashboard/stats');
+    if (data) {
+      document.getElementById('statStock').textContent = data.stock_disponible || 0;
+      document.getElementById('statVentas').textContent = data.total_ventas || 0;
+      document.getElementById('statInstPend').textContent = data.instalaciones_pendientes || 0;
+      
+      const container = document.getElementById('stockModelosTable');
+      if (container && data.desglose_modelos) {
+        let html = '<table><thead><tr><th>Modelo de Equipo</th><th>Cantidad en Stock</th></tr></thead><tbody>';
+        for (let [mod, cnt] of Object.entries(data.desglose_modelos)) {
+          html += `<tr><td><b>${mod}</b></td><td><span class="badge enruta">${cnt}</span></td></tr>`;
+        }
+        html += '</tbody></table>';
+        container.innerHTML = html;
+      }
+    }
+  } catch (e) {
+    console.error('Error cargando stats dashboard:', e);
+  }
+}
+
+async function ejecutarTrazabilidad() {
+  const input = document.getElementById('traceSearchInput');
+  const container = document.getElementById('traceResults');
+  if (!input || !container) return;
+  const q = input.value.trim();
+  if (!q) return toast('Escribe un término de búsqueda (Serial, Cédula, Nombre...)', 'error');
+
+  container.innerHTML = '<p style="color:var(--muted)">🔍 Rastreando en el historial...</p>';
+
+  try {
+    const data = await apiGet(`/dashboard/trazabilidad?query=${encodeURIComponent(q)}`);
+    let html = '';
+
+    const hasResults = (data.equipos && data.equipos.length) || 
+                       (data.ventas && data.ventas.length) || 
+                       (data.instalaciones && data.instalaciones.length) || 
+                       (data.equipos_cliente && data.equipos_cliente.length);
+
+    if (!hasResults) {
+      container.innerHTML = '<p style="color:var(--muted)">No se encontraron coincidencias en el historial.</p>';
+      return;
+    }
+
+    if (data.equipos && data.equipos.length) {
+      html += `<h4 style="color:var(--accent); margin:1rem 0 .4rem 0">📦 Equipos Encontrados (${data.equipos.length})</h4><table><thead><tr><th>ID</th><th>Serial PON</th><th>Modelo</th><th>Estado</th><th>Recepción</th></tr></thead><tbody>`;
+      data.equipos.forEach(e => {
+        html += `<tr><td><b>${e.id}</b></td><td><code>${e.serial_pon}</code></td><td>${e.modelo}</td><td><span class="badge ${e.estado.toLowerCase()}">${e.estado}</span></td><td>${e.id_recepcion||'-'}</td></tr>`;
+      });
+      html += '</tbody></table>';
+    }
+
+    if (data.ventas && data.ventas.length) {
+      html += `<h4 style="color:var(--accent); margin:1rem 0 .4rem 0">🛒 Ventas Encontradas (${data.ventas.length})</h4><table><thead><tr><th>ID Venta</th><th>Cliente</th><th>Cédula/RIF</th><th>Asesor</th><th>Estado Inst.</th></tr></thead><tbody>`;
+      data.ventas.forEach(v => {
+        html += `<tr><td><b>${v.id_venta||'V_'+v.id}</b></td><td>${v.cliente}</td><td>${v.cedula_rif||'-'}</td><td>${v.asesor||'-'}</td><td><span class="badge ${(v.status_instalacion||'').toLowerCase()}">${v.status_instalacion||'-'}</span></td></tr>`;
+      });
+      html += '</tbody></table>';
+    }
+
+    if (data.instalaciones && data.instalaciones.length) {
+      html += `<h4 style="color:var(--accent); margin:1rem 0 .4rem 0">📋 Instalaciones (${data.instalaciones.length})</h4><table><thead><tr><th>ID</th><th>Cliente</th><th>Nodo</th><th>Serial ONU</th><th>PPPoE</th><th>Estado</th></tr></thead><tbody>`;
+      data.instalaciones.forEach(i => {
+        html += `<tr><td><b>${i.id}</b></td><td>${i.cliente}</td><td>${i.nodo||'-'}</td><td><code>${i.serial_onu||'-'}</code></td><td>${i.pppoe||'-'}</td><td><span class="badge ${i.status.toLowerCase()}">${i.status}</span></td></tr>`;
+      });
+      html += '</tbody></table>';
+    }
+
+    if (data.equipos_cliente && data.equipos_cliente.length) {
+      html += `<h4 style="color:var(--accent); margin:1rem 0 .4rem 0">🏠 Equipos Propios / EETL (${data.equipos_cliente.length})</h4><table><thead><tr><th>ID</th><th>Cliente</th><th>Serial PON</th><th>Modelo</th><th>Técnico</th></tr></thead><tbody>`;
+      data.equipos_cliente.forEach(ec => {
+        html += `<tr><td><b>${ec.id}</b></td><td>${ec.cliente}</td><td><code>${ec.serial_pon}</code></td><td>${ec.modelo||'-'}</td><td>${ec.instalador||'-'}</td></tr>`;
+      });
+      html += '</tbody></table>';
+    }
+
+    container.innerHTML = html;
+
+  } catch (err) {
+    container.innerHTML = '<p style="color:var(--danger)">Error al consultar trazabilidad</p>';
+  }
 }
 
 // ================= TOAST =================

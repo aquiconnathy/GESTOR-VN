@@ -36,10 +36,23 @@ async def recibir_equipos(data: RecepcionIn, db: AsyncSession = Depends(get_db))
         existentes = {r[0] for r in res.all()}
 
         id_rec = await next_seq(db, "seq_recepcion", "REC_", 3)
-        cant_ax = cant_onu = cant_ac = 0
-        equipos_creados = []
         now = datetime.now()
 
+        # 1. Crear el objeto Recepción primero y hacer flush para cumplir la Foreign Key
+        rec = Recepcion(
+            id=id_rec, fecha_ingreso=data.fecha_ingreso or now,
+            entrega=data.entrega or "", recibe=data.recibe or "",
+            firma_entrega=data.firma_entrega or "", firma_recibe=data.firma_recibe or "",
+            observaciones=data.observaciones or "",
+            cantidad=0, cant_ax=0, cant_onu=0, cant_ac=0
+        )
+        db.add(rec)
+        await db.flush()
+
+        cant_ax = cant_onu = cant_ac = 0
+        equipos_creados = []
+
+        # 2. Insertar equipos asociados a id_rec
         for item in data.equipos:
             serial = item.serial_pon.upper().strip()
             modelo = (item.modelo or "AX30-H").upper().strip()
@@ -64,16 +77,14 @@ async def recibir_equipos(data: RecepcionIn, db: AsyncSession = Depends(get_db))
             existentes.add(serial)
 
         if not equipos_creados:
+            await db.rollback()
             raise HTTPException(status_code=400, detail="Sin equipos válidos para registrar (todos duplicados o vacíos)")
 
-        rec = Recepcion(
-            id=id_rec, fecha_ingreso=data.fecha_ingreso or now,
-            entrega=data.entrega or "", recibe=data.recibe or "",
-            firma_entrega=data.firma_entrega or "", firma_recibe=data.firma_recibe or "",
-            observaciones=data.observaciones or "",
-            cantidad=len(equipos_creados), cant_ax=cant_ax, cant_onu=cant_onu, cant_ac=cant_ac
-        )
-        db.add(rec)
+        rec.cantidad = len(equipos_creados)
+        rec.cant_ax = cant_ax
+        rec.cant_onu = cant_onu
+        rec.cant_ac = cant_ac
+        
         await db.commit()
 
         out_equipos = [
