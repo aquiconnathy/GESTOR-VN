@@ -130,3 +130,14 @@ class TelegramLog(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     key_notif = Column(String, unique=True)
     sent_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class Usuario(Base):
+    __tablename__ = "usuarios"
+    id = Column(String, primary_key=True)
+    nombre = Column(Text, nullable=False)
+    email = Column(Text, unique=True, nullable=False)
+    password_hash = Column(Text, nullable=False)
+    rol = Column(String, nullable=False)
+    activo = Column(Integer, default=1)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
