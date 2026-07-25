@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey, text
+from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey, text, Boolean
 from sqlalchemy.sql import func
 from app.db import Base
 
@@ -138,6 +138,5 @@ class Usuario(Base):
     email = Column(Text, unique=True, nullable=False)
     password_hash = Column(Text, nullable=False)
     rol = Column(String, nullable=False)
-    activo = Column(Integer, default=1)
+    activo = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
