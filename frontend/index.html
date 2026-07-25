@@ -46,7 +46,10 @@
   <div id="appScreen" style="display:none">
     <header>
       <div class="header-top">
-        <h1>🔧 GESTOR-VN</h1>
+        <div style="display:flex; align-items:center">
+          <button type="button" class="btn-toggle-menu" onclick="toggleSidebar()" title="Abrir/Cerrar Menú Lateral">☰</button>
+          <h1>🔧 GESTOR-VN</h1>
+        </div>
         <div class="user-badge" id="userBadge">
           <span id="userName">Usuario</span>
           <span id="userRole" class="badge-role">ROL</span>
@@ -55,18 +58,29 @@
       </div>
     </header>
 
-    <nav id="mainNav">
-      <button id="nav-dashboard" class="active" onclick="showView('dashboard')">📊 Dashboard</button>
-      <button id="nav-ventas" onclick="showView('ventas')">🛒 Ventas</button>
-      <button id="nav-recepcion" onclick="showView('recepcion')">📥 Recepción</button>
-      <button id="nav-instalaciones" onclick="showView('instalaciones')">📋 Instalaciones</button>
-      <button id="nav-despacho" onclick="showView('despacho')">🚚 Despacho</button>
-      <button id="nav-config" onclick="showView('config')">⚙️ Configurar</button>
-      <button id="nav-evaluacion" onclick="showView('evaluacion')">🧪 Evaluación</button>
-      <button id="nav-admin-config" onclick="showView('admin-config')">⚙️ Config Admin</button>
-    </nav>
+    <div class="app-layout">
+      <!-- OVERLAY BACKDROP EN MÓVILES -->
+      <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
-    <main>
+      <!-- MENÚ LATERAL DESPLEGABLE -->
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+          <span>MENÚ PRINCIPAL</span>
+          <button type="button" class="btn-close-sidebar" onclick="toggleSidebar()">✕</button>
+        </div>
+        <nav id="mainNav">
+          <button id="nav-dashboard" class="active" onclick="showView('dashboard')">📊 Dashboard</button>
+          <button id="nav-ventas" onclick="showView('ventas')">🛒 Ventas</button>
+          <button id="nav-recepcion" onclick="showView('recepcion')">📥 Recepción</button>
+          <button id="nav-instalaciones" onclick="showView('instalaciones')">📋 Instalaciones</button>
+          <button id="nav-despacho" onclick="showView('despacho')">🚚 Despacho</button>
+          <button id="nav-config" onclick="showView('config')">⚙️ Configurar</button>
+          <button id="nav-evaluacion" onclick="showView('evaluacion')">🧪 Evaluación</button>
+          <button id="nav-admin-config" onclick="showView('admin-config')">⚙️ Config Admin</button>
+        </nav>
+      </aside>
+
+      <main class="main-content">
       <!-- DASHBOARD & TRAZABILIDAD -->
       <section id="view-dashboard" class="view active">
         <div class="grid-3" style="margin-bottom:1rem">

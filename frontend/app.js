@@ -92,6 +92,20 @@ function applyRolePermissions() {
   if (firstAllowed) showView(firstAllowed);
 }
 
+// ================= SIDEBAR DESPLEGABLE =================
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  if (!sidebar) return;
+
+  if (window.innerWidth <= 768) {
+    sidebar.classList.toggle('mobile-open');
+    if (overlay) overlay.classList.toggle('active');
+  } else {
+    sidebar.classList.toggle('collapsed');
+  }
+}
+
 // ================= NAVEGACIÓN =================
 function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -102,6 +116,14 @@ function showView(id) {
   
   const targetNav = document.getElementById('nav-' + id);
   if (targetNav) targetNav.classList.add('active');
+
+  // Cerrar menú en móviles al hacer clic en un item
+  if (window.innerWidth <= 768) {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (sidebar) sidebar.classList.remove('mobile-open');
+    if (overlay) overlay.classList.remove('active');
+  }
 
   if (id === 'dashboard') cargarEstadisticasDashboard();
   if (id === 'instalaciones') cargarPendientes();
