@@ -278,10 +278,10 @@ function playBeep() {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = ctx.createOscillator();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(900, ctx.currentTime);
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
     osc.connect(ctx.destination);
     osc.start();
-    osc.stop(ctx.currentTime + 0.12);
+    osc.stop(ctx.currentTime + 0.15);
   } catch(e) {}
 }
 
@@ -289,7 +289,13 @@ function playBeep() {
 function toggleScanner() {
   const reader = document.getElementById('reader');
   if (html5QrCode) {
-    html5QrCode.stop().then(() => { html5QrCode = null; reader.innerHTML = ''; });
+    html5QrCode.stop().then(() => { 
+      html5QrCode = null; 
+      reader.innerHTML = ''; 
+    }).catch(() => {
+      html5QrCode = null;
+      reader.innerHTML = '';
+    });
     return;
   }
 
@@ -297,42 +303,64 @@ function toggleScanner() {
     Html5QrcodeSupportedFormats.CODE_128,
     Html5QrcodeSupportedFormats.CODE_39,
     Html5QrcodeSupportedFormats.EAN_13,
+    Html5QrcodeSupportedFormats.UPC_A,
     Html5QrcodeSupportedFormats.QR_CODE
   ] : undefined;
 
-  html5QrCode = new Html5Qrcode("reader");
+  html5QrCode = new Html5Qrcode("reader", {
+    experimentalFeatures: {
+      useBarCodeDetectorIfSupported: true
+    }
+  });
 
   const config = {
-    fps: 15,
-    qrbox: { width: 280, height: 75 } // Enfoque horizontal estrecho para aislar el código PON S/N entre varios verticales
+    fps: 20,
+    qrbox: (viewfinderWidth, viewfinderHeight) => {
+      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+      const width = Math.floor(viewfinderWidth * 0.85);
+      const height = Math.floor(minEdge * 0.35);
+      return { width, height };
+    },
+    aspectRatio: 1.777778
   };
+
   if (formatsToSupport) config.formatsToSupport = formatsToSupport;
 
-  html5QrCode.start(
-    { facingMode: "environment" },
-    config,
-    (decodedText) => {
-      let raw = decodedText.trim().toUpperCase();
-      
-      // Buscar patrón PON S/N de VSOL (ej: VSOL00E3E501) o cualquier serial de 8 a 16 caracteres
-      let serial = null;
-      const vsolMatch = raw.match(/VSOL[0-9A-Z]{8}/);
-      if (vsolMatch) {
-        serial = vsolMatch[0];
-      } else if (/^[0-9A-Z]{8,16}$/.test(raw)) {
-        serial = raw;
-      }
+  const cameraConfig = { 
+    facingMode: "environment",
+    width: { ideal: 1920 },
+    height: { ideal: 1080 }
+  };
 
-      if (serial && !scanned.includes(serial)) {
-        scanned.push(serial);
-        playBeep();
-        document.getElementById('scannedList').value = scanned.map(s => s + ',AX30-H').join('\n');
-        document.getElementById('scanCount').textContent = scanned.length;
-        toast('📷 Serial PON detectado: ' + serial);
-      }
-    },
-    (err) => {}
-  ).catch(err => toast('Error al iniciar cámara: ' + err, 'error'));
+  const processText = (decodedText) => {
+    let raw = decodedText.trim().replace(/[\r\n\t]/g, '').toUpperCase();
+    let serial = null;
+
+    // 1. Buscar patrón PON S/N (ej: VSOL00E3E501)
+    const vsolMatch = raw.match(/VSOL[0-9A-Z]{8}/);
+    if (vsolMatch) {
+      serial = vsolMatch[0];
+    } else {
+      // 2. Buscar cualquier código alfanumérico limpio de 10 a 16 caracteres
+      const cleanMatch = raw.match(/[0-9A-Z]{10,16}/);
+      if (cleanMatch) serial = cleanMatch[0];
+    }
+
+    if (serial && !scanned.includes(serial)) {
+      scanned.push(serial);
+      playBeep();
+      document.getElementById('scannedList').value = scanned.map(s => s + ',AX30-H').join('\n');
+      document.getElementById('scanCount').textContent = scanned.length;
+      toast('✅ Detectado: ' + serial);
+    }
+  };
+
+  html5QrCode.start(cameraConfig, config, processText, () => {})
+    .catch(() => {
+      // Fallback a configuración de cámara por defecto si 1080p falla en el teléfono
+      html5QrCode.start({ facingMode: "environment" }, { fps: 15 }, processText, () => {})
+        .catch(err => toast('No se pudo abrir la cámara: ' + err, 'error'));
+    });
 }
 
 // ================= RECEPCIÓN =================
