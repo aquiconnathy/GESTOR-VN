@@ -46,11 +46,13 @@
   <div id="appScreen" style="display:none">
     <header>
       <div class="header-top">
-        <div style="display:flex; align-items:center">
+        <div style="display:flex; align-items:center; gap:.5rem">
           <button type="button" class="btn-toggle-menu" onclick="toggleSidebar()" title="Abrir/Cerrar Menú Lateral">☰</button>
-          <h1>🔧 GESTOR-VN</h1>
+          <img id="appLogoImg" src="" style="max-height:28px; display:none; border-radius:.3rem" alt="Logo">
+          <h1 id="appLogoText">🔧 GESTOR-VN</h1>
         </div>
         <div class="user-badge" id="userBadge">
+          <button type="button" id="btnTheme" class="btn-logout" onclick="toggleTheme()" title="Cambiar Tema Claro / Oscuro" style="font-size:1.1rem">🌙</button>
           <span id="userName">Usuario</span>
           <span id="userRole" class="badge-role">ROL</span>
           <button class="btn-logout" onclick="handleLogout()" title="Cerrar Sesión">🔒</button>
@@ -474,9 +476,22 @@
 
           <!-- REORDENADOR DE PESTAÑAS ARRISTRABLE -->
           <div style="background:#182232; padding:.8rem; border-radius:.5rem; margin-bottom:1.2rem; border:1px solid #3b82f6">
-            <h3 style="color:#3b82f6; margin:0 0 .5rem 0">📱 Orden de Pestañas del Menú (Arrastrar y Soltar)</h3>
-            <p style="font-size:.8rem; color:var(--muted); margin-bottom:.75rem">Mantén presionado y <b>arrastra</b> cada elemento hacia arriba o abajo para organizar el menú lateral. Haz clic en <b>Guardar Ajustes Globales</b> para aplicar los cambios:</p>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.5rem">
+              <h3 style="color:#3b82f6; margin:0">📱 Orden de Pestañas del Menú (Arrastrar y Soltar)</h3>
+              <button type="button" class="btn success" style="width:auto; padding:.3rem .8rem; font-size:.85rem; margin:0" onclick="guardarConfiguracionSistemaAdmin()">💾 Guardar Orden del Menú</button>
+            </div>
+            <p style="font-size:.8rem; color:var(--muted); margin-bottom:.75rem">Mantén presionado y <b>arrastra</b> cada elemento hacia arriba o abajo para organizar el menú lateral. Haz clic en <b>Guardar Orden del Menú</b> para aplicar:</p>
             <div id="adminListaMenuOrden" style="display:flex; flex-direction:column; gap:.4rem"></div>
+          </div>
+
+          <!-- LOGO DEL SISTEMA -->
+          <div style="background:#182232; padding:.8rem; border-radius:.5rem; margin-bottom:1.2rem; border:1px solid #ec4899">
+            <h3 style="color:#ec4899; margin:0 0 .5rem 0">🖼️ Logo del Sistema</h3>
+            <p style="font-size:.8rem; color:var(--muted); margin-bottom:.5rem">Ingresa la URL de la imagen de tu logo corporativo para mostrarlo en el encabezado:</p>
+            <div style="display:flex; gap:.5rem">
+              <input type="url" id="adminLogoUrl" placeholder="https://ejemplo.com/logo-empresa.png" style="flex:1">
+              <button type="button" class="btn success" style="width:auto; padding:0 1rem; margin:0" onclick="aplicarLogoAdmin()">🖼️ Aplicar y Guardar Logo</button>
+            </div>
           </div>
 
           <!-- GESTIÓN DE USUARIOS, ROLES Y CREDENCIALES -->
@@ -579,8 +594,52 @@
 
           <div style="border-top:1px solid #334155; padding-top:1rem">
             <h3 style="margin:0 0 .5rem 0">📤 Exportación CSV / Excel</h3>
-            <button class="btn success" style="width:auto; padding:.5rem 1.2rem" onclick="exportarDataCSV()">📤 Exportar Inventario Completo a CSV</button>
+            <button type="button" class="btn success" style="width:auto; padding:.5rem 1.2rem" onclick="exportarDataCSV()">📤 Exportar Inventario Completo a CSV</button>
           </div>
+        </div>
+
+        <!-- IMPORTACIÓN MASIVA DE DATA DESDE EXCEL / CSV -->
+        <div class="card">
+          <h2>📥 Importador Masivo de Datos (Excel / CSV / Pegado Directo)</h2>
+          <p style="font-size:.85rem; color:var(--muted); margin-bottom:1rem">Sube data masiva de prueba o inventario existente desde tus hojas de cálculo Excel o Google Sheets:</p>
+
+          <form onsubmit="handleImportarDataMasiva(event)">
+            <div class="grid-2">
+              <div>
+                <label>1. Tipo de Data a Importar *</label>
+                <select id="impTipo" required style="font-weight:700; color:var(--accent)">
+                  <option value="equipos">📦 Equipos / Inventario (Serial, Modelo, Marca)</option>
+                  <option value="ventas">🛒 Ventas & Instalaciones Históricas (Cliente, Cédula, Contacto, Nodo, Plan)</option>
+                </select>
+              </div>
+              <div>
+                <label>2. Formato o Modo de Carga *</label>
+                <select id="impModo" onchange="toggleModoImportacionUI(this.value)">
+                  <option value="pegar">📋 Pegar Filas / Columnas de Excel en Texto</option>
+                  <option value="csv">📄 Subir Archivo CSV / TXT</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- MODO PEGAR DESDE EXCEL -->
+            <div id="boxImportarPegar" style="margin-top:.75rem">
+              <label>Pega aquí tus datos copiados de Excel (Una línea por registro, separados por coma o tabulación):</label>
+              <textarea id="impTextarea" rows="6" placeholder="Ejemplo para Equipos:
+VSOL00E1E501, AX30-H, VSOL
+VSOL00E1E502, V2801S-B, VSOL
+
+Ejemplo para Ventas:
+Juan Perez, V12345678, 04141234567, NODO CENTRO, PLAN 100 MEGA FIBRA, ESTANDAR"></textarea>
+            </div>
+
+            <!-- MODO SUBIR ARCHIVO -->
+            <div id="boxImportarArchivo" style="display:none; margin-top:.75rem">
+              <label>Selecciona tu archivo .CSV o .TXT:</label>
+              <input type="file" id="impFileInput" accept=".csv, .txt">
+            </div>
+
+            <button type="submit" class="btn success" style="margin-top:1rem; font-size:1rem">📥 Procesar e Importar Data Masiva</button>
+          </form>
         </div>
       </section>
     </main>

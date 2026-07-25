@@ -64,3 +64,87 @@ async def guardar_configuracion_sistema(data: SystemSettings, db: AsyncSession =
     
     await db.commit()
     return {"status": "success", "message": "Configuración del sistema guardada con éxito"}
+
+class ImportarEquiposIn(BaseModel):
+    items: List[Dict[str, Any]]
+
+class ImportarVentasIn(BaseModel):
+    items: List[Dict[str, Any]]
+
+@router.post("/importar/equipos")
+async def importar_equipos_masivo(data: ImportarEquiposIn, db: AsyncSession = Depends(get_db)):
+    from app.models import Equipo
+    count = 0
+    for item in data.items:
+        serial = str(item.get("serial_pon") or item.get("serial") or "").strip().upper()
+        if not serial:
+            continue
+        modelo = str(item.get("modelo") or "AX30-H").strip().upper()
+        marca = str(item.get("marca") or "VSOL").strip().upper()
+        estado = str(item.get("estado") or "DISPONIBLE").strip().upper()
+        
+        stmt = select(Equipo).where(Equipo.serial_pon == serial)
+        res = await db.execute(stmt)
+        eq = res.scalar_one_or_none()
+        if not eq:
+            id_eq = f"EQ_IMP_{serial[-6:]}"
+            eq = Equipo(id=id_eq, serial_pon=serial, modelo=modelo, marca=marca, estado=estado)
+            db.add(eq)
+        else:
+            eq.modelo = modelo
+            eq.marca = marca
+            eq.estado = estado
+        count += 1
+    
+    await db.commit()
+    return {"status": "success", "message": f"Importados {count} equipos exitosamente"}
+
+@router.post("/importar/ventas")
+async def importar_ventas_masivo(data: ImportarVentasIn, db: AsyncSession = Depends(get_db)):
+    from app.models import Venta, Instalacion
+    count = 0
+    for item in data.items:
+        cliente = str(item.get("nombre_cliente") or item.get("cliente") or "").strip()
+        if not cliente:
+            continue
+        cedula = str(item.get("cedula_rif") or item.get("cedula") or "").strip()
+        contacto = str(item.get("nro_contacto") or item.get("contacto") or "").strip()
+        nodo = str(item.get("nodo") or "NODO CENTRO").strip().upper()
+        plan = str(item.get("plan_servicio") or item.get("plan") or "PLAN 100 MEGA FIBRA").strip()
+        promo = str(item.get("promocion") or "ESTÁNDAR").strip().upper()
+        num_serv = str(item.get("numero_servicio") or "1").strip()
+
+        id_vta = f"V_IMP_{count+1:03d}"
+        id_inst = f"INS_IMP_{count+1:03d}"
+
+        v = Venta(
+            id_venta=id_vta,
+            nombre_cliente=cliente,
+            cedula_rif=cedula,
+            nro_contacto=contacto,
+            nodo=nodo,
+            plan_servicio=plan,
+            promocion=promo,
+            numero_servicio=num_serv,
+            id_instalacion=id_inst,
+            status_instalacion="PENDIENTE_ASIGNAR"
+        )
+        db.add(v)
+
+        inst = Instalacion(
+            id=id_inst,
+            id_venta=id_vta,
+            nombre_cliente=cliente,
+            cedula_rif=cedula,
+            nro_contacto=contacto,
+            nodo=nodo,
+            plan_servicio=plan,
+            promocion=promo,
+            numero_servicio=num_serv,
+            status="PENDIENTE_ASIGNAR"
+        )
+        db.add(inst)
+        count += 1
+
+    await db.commit()
+    return {"status": "success", "message": f"Importadas {count} ventas e instalaciones de prueba"}

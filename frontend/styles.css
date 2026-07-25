@@ -3,9 +3,33 @@
   --bg: #0f172a; --card: #1e293b; --accent: #3b82f6;
   --text: #f1f5f9; --muted: #94a3b8; --success: #22c55e; --danger: #ef4444;
 }
+body.light-theme {
+  --bg: #f1f5f9; --card: #ffffff; --accent: #2563eb;
+  --text: #0f172a; --muted: #64748b; --success: #16a34a; --danger: #dc2626;
+}
+body.light-theme header,
+body.light-theme .sidebar,
+body.light-theme .card {
+  background: #ffffff; border-color: #cbd5e1;
+}
+body.light-theme input, 
+body.light-theme select, 
+body.light-theme textarea {
+  background: #f8fafc; color: #0f172a; border-color: #cbd5e1;
+}
+body.light-theme th {
+  background: #e2e8f0; color: #334155;
+}
+body.light-theme tr:hover {
+  background: #f1f5f9;
+}
+body.light-theme .user-badge {
+  background: #f8fafc; border-color: #cbd5e1;
+}
+
 body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  background: var(--bg); color: var(--text); min-height: 100vh;
+  background: var(--bg); color: var(--text); min-height: 100vh; transition: background .3s, color .3s;
 }
 header {
   background: var(--card); padding: .75rem 1rem; border-bottom: 1px solid #334155;

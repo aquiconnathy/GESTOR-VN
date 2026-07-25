@@ -7,8 +7,39 @@ let ventasCache = [];
 
 // ================= INICIALIZACIÓN =================
 document.addEventListener('DOMContentLoaded', () => {
+  loadSavedTheme();
   checkAuth();
 });
+
+// ================= TEMA CLARO / OSCURO =================
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-theme');
+  localStorage.setItem('umsr_theme', isLight ? 'light' : 'dark');
+  const btn = document.getElementById('btnTheme');
+  if (btn) btn.textContent = isLight ? '☀️' : '🌙';
+}
+
+function loadSavedTheme() {
+  const theme = localStorage.getItem('umsr_theme');
+  if (theme === 'light') {
+    document.body.classList.add('light-theme');
+    const btn = document.getElementById('btnTheme');
+    if (btn) btn.textContent = '☀️';
+  }
+}
+
+function renderLogoUI(logoUrl) {
+  const img = document.getElementById('appLogoImg');
+  const text = document.getElementById('appLogoText');
+  const urlInput = document.getElementById('adminLogoUrl');
+  
+  if (logoUrl) {
+    if (img) { img.src = logoUrl; img.style.display = 'inline-block'; }
+    if (urlInput) urlInput.value = logoUrl;
+  } else {
+    if (img) img.style.display = 'none';
+  }
+}
 
 // ================= AUTENTICACIÓN =================
 function checkAuth() {
@@ -1044,12 +1075,21 @@ async function cargarConfiguracionSistemaAdmin() {
     const data = await apiGet('/admin/settings');
     if (data) adminSettingsCache = data;
     renderAdminSettingsUI();
+    renderLogoUI(adminSettingsCache.logo_url);
     cargarUsuariosAdmin();
   } catch (e) {
     console.error('Error cargando admin settings:', e);
     renderAdminSettingsUI();
     cargarUsuariosAdmin();
   }
+}
+
+async function aplicarLogoAdmin() {
+  const url = document.getElementById('adminLogoUrl').value.trim();
+  adminSettingsCache.logo_url = url;
+  renderLogoUI(url);
+  await guardarConfiguracionSistemaAdmin();
+  toast('✅ Logo del sistema actualizado');
 }
 
 const ALL_TABS_MAP = {
@@ -1353,5 +1393,80 @@ async function eliminarUsuarioAdmin(userId, nombre) {
     cargarUsuariosAdmin();
   } catch (err) {
     toast('Error eliminando usuario: ' + err.message, 'error');
+  }
+}
+
+// ================= IMPORTADOR MASIVO DE DATOS (CSV / EXCEL) =================
+function toggleModoImportacionUI(modo) {
+  document.getElementById('boxImportarPegar').style.display = (modo === 'pegar') ? 'block' : 'none';
+  document.getElementById('boxImportarArchivo').style.display = (modo === 'csv') ? 'block' : 'none';
+}
+
+async function handleImportarDataMasiva(e) {
+  e.preventDefault();
+  const tipo = document.getElementById('impTipo').value;
+  const modo = document.getElementById('impModo').value;
+
+  let rawText = '';
+
+  if (modo === 'pegar') {
+    rawText = document.getElementById('impTextarea').value.trim();
+    if (!rawText) return toast('Pega los datos de Excel en el cuadro de texto', 'error');
+    await procesarTextoEImportar(tipo, rawText);
+  } else {
+    const fileInput = document.getElementById('impFileInput');
+    if (!fileInput.files || !fileInput.files.length) return toast('Selecciona un archivo .CSV o .TXT', 'error');
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = async function(evt) {
+      rawText = evt.target.result;
+      await procesarTextoEImportar(tipo, rawText);
+    };
+    reader.readAsText(file);
+  }
+}
+
+async function procesarTextoEImportar(tipo, textContent) {
+  const lines = textContent.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (!lines.length) return toast('No hay líneas válidas para procesar', 'error');
+
+  const items = [];
+
+  lines.forEach(line => {
+    const parts = line.split(/[\t,]+/).map(p => p.trim());
+    if (tipo === 'equipos') {
+      if (parts.length >= 1) {
+        items.push({
+          serial_pon: parts[0],
+          modelo: parts[1] || 'AX30-H',
+          marca: parts[2] || 'VSOL',
+          estado: 'DISPONIBLE'
+        });
+      }
+    } else if (tipo === 'ventas') {
+      if (parts.length >= 1) {
+        items.push({
+          nombre_cliente: parts[0],
+          cedula_rif: parts[1] || '',
+          nro_contacto: parts[2] || '',
+          nodo: parts[3] || 'NODO CENTRO',
+          plan_servicio: parts[4] || 'PLAN 100 MEGA FIBRA',
+          promocion: parts[5] || 'ESTÁNDAR'
+        });
+      }
+    }
+  });
+
+  if (!items.length) return toast('No se pudieron estructurar ítems válidos', 'error');
+
+  try {
+    toast(`Importando ${items.length} registros a la base de datos...`, 'info');
+    const endpoint = tipo === 'equipos' ? '/admin/importar/equipos' : '/admin/importar/ventas';
+    const res = await apiPost(endpoint, { items });
+    toast(`✅ ${res.message}`);
+    document.getElementById('impTextarea').value = '';
+    cargarEstadisticasDashboard();
+  } catch (err) {
+    toast('Error importando datos: ' + err.message, 'error');
   }
 }
