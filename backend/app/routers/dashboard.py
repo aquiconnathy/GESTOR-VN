@@ -134,3 +134,29 @@ async def buscar_trazabilidad(query: str = Query(..., min_length=2), db: AsyncSe
             } for ec in equipos_cliente
         ]
     }
+
+@router.get("/auditoria")
+async def consultar_auditoria(query: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+    try:
+        if query and query.strip():
+            q = f"%{query.strip().upper()}%"
+            stmt = text("SELECT entidad, entidad_id, accion, estado_anterior, estado_nuevo, usuario, detalles, created_at FROM auditoria_eventos WHERE entidad_id ILIKE :q OR detalles ILIKE :q ORDER BY id DESC LIMIT 50")
+            res = await db.execute(stmt, {"q": q})
+        else:
+            stmt = text("SELECT entidad, entidad_id, accion, estado_anterior, estado_nuevo, usuario, detalles, created_at FROM auditoria_eventos ORDER BY id DESC LIMIT 50")
+            res = await db.execute(stmt)
+        rows = res.fetchall()
+        return [
+            {
+                "entidad": r[0],
+                "entidad_id": r[1],
+                "accion": r[2],
+                "estado_anterior": r[3],
+                "estado_nuevo": r[4],
+                "usuario": r[5],
+                "detalles": r[6],
+                "created_at": str(r[7]) if r[7] else None
+            } for r in rows
+        ]
+    except Exception:
+        return []

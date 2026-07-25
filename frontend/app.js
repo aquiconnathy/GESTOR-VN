@@ -249,6 +249,28 @@ async function ejecutarTrazabilidad() {
       html += '</tbody></table>';
     }
 
+    // Historial de Auditoría y Transiciones de Estado
+    try {
+      const auditEvents = await apiGet(`/dashboard/auditoria?query=${encodeURIComponent(q)}`);
+      if (auditEvents && auditEvents.length) {
+        html += `<h4 style="color:#8b5cf6; margin:1.2rem 0 .4rem 0">📜 Historial de Auditoría & Transiciones (${auditEvents.length})</h4><table><thead><tr><th>Entidad</th><th>ID</th><th>Acción</th><th>Estado Anterior</th><th>Estado Nuevo</th><th>Usuario</th><th>Fecha</th></tr></thead><tbody>`;
+        auditEvents.forEach(a => {
+          html += `<tr>
+            <td><span class="badge" style="background:#334155">${a.entidad}</span></td>
+            <td><b>${a.entidad_id}</b></td>
+            <td><b>${a.accion}</b></td>
+            <td>${a.estado_anterior || '-'}</td>
+            <td><span class="badge enruta">${a.estado_nuevo || '-'}</span></td>
+            <td>${a.usuario || 'Sistema'}</td>
+            <td>${a.created_at ? a.created_at.replace('T', ' ').substring(0, 16) : '-'}</td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+      }
+    } catch (e) {
+      console.error('Error cargando auditoria en trazabilidad:', e);
+    }
+
     container.innerHTML = html;
 
   } catch (err) {

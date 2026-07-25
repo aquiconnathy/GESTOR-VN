@@ -59,10 +59,24 @@ CREATE TABLE IF NOT EXISTS evaluaciones (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 7. Índices para Trazabilidad Ultrarrápida por Serial, Cédula o Nombre
+-- 7. Tabla de Auditoría e Historial de Eventos
+CREATE TABLE IF NOT EXISTS auditoria_eventos (
+    id SERIAL PRIMARY KEY,
+    entidad VARCHAR NOT NULL,
+    entidad_id VARCHAR NOT NULL,
+    accion VARCHAR NOT NULL,
+    estado_anterior VARCHAR,
+    estado_nuevo VARCHAR,
+    usuario TEXT,
+    detalles TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 8. Índices para Trazabilidad Ultrarrápida por Serial, Cédula o Nombre
 CREATE INDEX IF NOT EXISTS idx_equipos_serial ON equipos(serial_pon);
 CREATE INDEX IF NOT EXISTS idx_equipos_estado ON equipos(estado);
 CREATE INDEX IF NOT EXISTS idx_instalaciones_cedula ON instalaciones(cedula_rif);
 CREATE INDEX IF NOT EXISTS idx_instalaciones_status ON instalaciones(status);
 CREATE INDEX IF NOT EXISTS idx_ventas_cedula ON ventas(cedula_rif);
 CREATE INDEX IF NOT EXISTS idx_evaluaciones_serial ON evaluaciones(serial_pon);
+CREATE INDEX IF NOT EXISTS idx_auditoria_entidad ON auditoria_eventos(entidad, entidad_id);
