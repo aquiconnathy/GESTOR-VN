@@ -287,85 +287,72 @@ function playBeep() {
 
 // ================= SCANNER UNIVERSAL =================
 function toggleScanner() {
-  const reader = document.getElementById('reader');
-  if (html5QrCode) {
-    html5QrCode.stop().then(() => { 
-      html5QrCode = null; 
-      reader.innerHTML = ''; 
-    }).catch(() => {
-      html5QrCode = null;
-      reader.innerHTML = '';
-    });
-    return;
-  }
-
-  // Habilitar TODOS los formatos de códigos de barras 1D y 2D
-  const formatsToSupport = window.Html5QrcodeSupportedFormats ? [
-    Html5QrcodeSupportedFormats.CODE_128,
-    Html5QrcodeSupportedFormats.CODE_39,
-    Html5QrcodeSupportedFormats.CODE_93,
-    Html5QrcodeSupportedFormats.EAN_13,
-    Html5QrcodeSupportedFormats.EAN_8,
-    Html5QrcodeSupportedFormats.UPC_A,
-    Html5QrcodeSupportedFormats.UPC_E,
-    Html5QrcodeSupportedFormats.ITF,
-    Html5QrcodeSupportedFormats.QR_CODE,
-    Html5QrcodeSupportedFormats.DATA_MATRIX
-  ] : undefined;
-
-  html5QrCode = new Html5Qrcode("reader", {
-    experimentalFeatures: {
-      useBarCodeDetectorIfSupported: true
+  try {
+    const reader = document.getElementById('reader');
+    if (html5QrCode) {
+      html5QrCode.stop().then(() => { 
+        html5QrCode = null; 
+        reader.innerHTML = ''; 
+      }).catch(() => {
+        html5QrCode = null;
+        reader.innerHTML = '';
+      });
+      return;
     }
-  });
 
-  const config = {
-    fps: 25,
-    qrbox: (viewfinderWidth, viewfinderHeight) => {
-      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-      const width = Math.floor(viewfinderWidth * 0.90);
-      const height = Math.floor(minEdge * 0.40);
-      return { width, height };
-    },
-    aspectRatio: 1.777778
-  };
+    let formatsToSupport = undefined;
+    if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+      formatsToSupport = [
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.QR_CODE
+      ];
+    }
 
-  if (formatsToSupport) config.formatsToSupport = formatsToSupport;
+    const config = {
+      fps: 20,
+      qrbox: { width: 280, height: 100 }
+    };
+    if (formatsToSupport) config.formatsToSupport = formatsToSupport;
 
-  const cameraConfig = { 
-    facingMode: "environment",
-    width: { ideal: 1920 },
-    height: { ideal: 1080 }
-  };
+    html5QrCode = new Html5Qrcode("reader");
 
-  const processText = (decodedText) => {
-    if (!decodedText) return;
-    
-    // Limpiar prefijos de etiquetas impresas ("S/N:", "PON S/N:", "SN:") y espacios
-    let raw = decodedText.trim()
-      .replace(/^(SN|S\/N|PON S\/N|PON|MAC):\s*/i, '')
-      .replace(/[\r\n\t\s]/g, '')
-      .toUpperCase();
+    const processText = (decodedText) => {
+      if (!decodedText) return;
+      
+      let raw = decodedText.trim()
+        .replace(/^(SN|S\/N|PON S\/N|PON|MAC):\s*/i, '')
+        .replace(/[\r\n\t\s]/g, '')
+        .toUpperCase();
 
-    // Aceptar cualquier código alfanumérico de cualquier marca (VSOL, Huawei, ZTE, Fiberhome, etc.)
-    if (/^[A-Z0-9\-\_]{4,32}$/.test(raw)) {
-      const serial = raw;
-      if (!scanned.includes(serial)) {
-        scanned.push(serial);
-        playBeep();
-        document.getElementById('scannedList').value = scanned.map(s => s + ',AX30-H').join('\n');
-        document.getElementById('scanCount').textContent = scanned.length;
-        toast('✅ Serial detectado: ' + serial);
+      if (/^[A-Z0-9\-\_]{4,32}$/.test(raw)) {
+        const serial = raw;
+        if (!scanned.includes(serial)) {
+          scanned.push(serial);
+          playBeep();
+          document.getElementById('scannedList').value = scanned.map(s => s + ',AX30-H').join('\n');
+          document.getElementById('scanCount').textContent = scanned.length;
+          toast('✅ Serial detectado: ' + serial);
+        }
       }
-    }
-  };
+    };
 
-  html5QrCode.start(cameraConfig, config, processText, () => {})
-    .catch(() => {
-      // Fallback a resolución por defecto si el teléfono no soporta 1080p
-      html5QrCode.start({ facingMode: "environment" }, { fps: 20 }, processText, () => {})
-        .catch(err => toast('No se pudo abrir la cámara: ' + err, 'error'));
-    });
+    html5QrCode.start(
+      { facingMode: "environment" },
+      config,
+      processText,
+      () => {}
+    ).catch(err => toast('Error de cámara: ' + err, 'error'));
+
+  } catch (err) {
+    toast('Error iniciando escáner: ' + err.message, 'error');
+  }
 }
 
 // ================= RECEPCIÓN =================
