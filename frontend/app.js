@@ -598,6 +598,7 @@ function handleSelectInstalacionConfig(selectEl) {
   document.getElementById('cfgNombre').value = inst.nombre_cliente || '';
   document.getElementById('cfgCedula').value = inst.cedula_rif || '';
   document.getElementById('cfgContacto').value = inst.nro_contacto || '';
+  document.getElementById('cfgCorreo').value = inst.correo_electronico || '';
   document.getElementById('cfgNodo').value = inst.nodo || '';
   document.getElementById('cfgDireccion').value = inst.direccion_exacta || '';
   document.getElementById('cfgPlan').value = inst.plan_servicio || '';
@@ -618,9 +619,14 @@ function handleSelectInstalacionConfig(selectEl) {
   document.getElementById('cfgPor').value = currentUser ? currentUser.nombre : '';
 }
 
+function descargarBackupDirecto(idInstalacion) {
+  window.open(`${API_URL}/instalaciones/${idInstalacion}/backup`, '_blank');
+}
+
 async function handleGuardarConfig(e) {
   e.preventDefault();
   const id_inst = document.getElementById('cfgId').value;
+  const pppoeVal = document.getElementById('cfgPppoe').value.trim();
   if (!id_inst) return toast('Selecciona una instalación de la lista', 'error');
 
   try {
@@ -630,12 +636,13 @@ async function handleGuardarConfig(e) {
       nombre_cliente: document.getElementById('cfgNombre').value.trim(),
       cedula_rif: document.getElementById('cfgCedula').value.trim(),
       nro_contacto: document.getElementById('cfgContacto').value.trim(),
+      correo_electronico: document.getElementById('cfgCorreo').value.trim(),
       direccion_exacta: document.getElementById('cfgDireccion').value.trim(),
       nodo: document.getElementById('cfgNodo').value.trim(),
       plan_servicio: document.getElementById('cfgPlan').value.trim(),
       promocion: document.getElementById('cfgPromo').value.trim(),
       serial_onu: document.getElementById('cfgSerial').value.trim().toUpperCase(),
-      pppoe: document.getElementById('cfgPppoe').value.trim(),
+      pppoe: pppoeVal,
       modelo: document.getElementById('cfgModelo').value.trim().toUpperCase(),
       marca: document.getElementById('cfgMarca').value.trim(),
       codigo_fibra: document.getElementById('cfgCodigoFibra').value.trim(),
@@ -644,7 +651,20 @@ async function handleGuardarConfig(e) {
       configurado_por: document.getElementById('cfgPor').value.trim()
     });
 
-    toast('✅ Equipo configurado con éxito (Pasa a CONFIGURADO)');
+    toast('✅ Equipo configurado con éxito');
+
+    const box = document.getElementById('boxDescargarBackup');
+    if (box) {
+      box.style.display = 'block';
+      box.innerHTML = `
+        <div style="background:#0284c7; padding:.9rem; border-radius:.5rem; text-align:center">
+          <h4 style="margin:0 0 .4rem 0; color:#fff">✅ Configuración Guardada con Éxito</h4>
+          <p style="font-size:.85rem; color:#e0f2fe; margin-bottom:.7rem">PPPoE asignado: <b>${pppoeVal}</b></p>
+          <button type="button" class="btn success" style="width:auto; padding:.5rem 1.2rem; margin:0; font-size:.95rem" onclick="descargarBackupDirecto('${id_inst}')">📥 Descargar Backup XML Personalizado</button>
+        </div>
+      `;
+    }
+
     cargarPendientes();
   } catch (err) {
     toast('Error en configuración: ' + err.message, 'error');

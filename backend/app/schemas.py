@@ -148,6 +148,7 @@ class ConfiguracionIn(BaseModel):
     nombre_cliente: Optional[str] = None
     cedula_rif: Optional[str] = None
     nro_contacto: Optional[str] = None
+    correo_electronico: Optional[str] = None
     direccion_exacta: Optional[str] = None
     nodo: Optional[str] = None
     plan_servicio: Optional[str] = None

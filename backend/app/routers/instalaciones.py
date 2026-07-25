@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from typing import List
@@ -111,6 +112,7 @@ async def configurar(data: ConfiguracionIn, db: AsyncSession = Depends(get_db)):
     if data.nombre_cliente: inst.nombre_cliente = data.nombre_cliente
     if data.cedula_rif: inst.cedula_rif = data.cedula_rif
     if data.nro_contacto: inst.nro_contacto = data.nro_contacto
+    if data.correo_electronico: inst.correo_electronico = data.correo_electronico
     if data.direccion_exacta: inst.direccion_exacta = data.direccion_exacta
     if data.nodo: inst.nodo = data.nodo
     if data.plan_servicio: inst.plan_servicio = data.plan_servicio
@@ -139,7 +141,10 @@ async def configurar(data: ConfiguracionIn, db: AsyncSession = Depends(get_db)):
         f"\n■ <b>NODO:</b> {esc_xml(inst.nodo)}\n"
         f"■ <b>CLIENTE:</b> <code>{esc_xml(inst.nombre_cliente)}</code>\n"
         f"■ <b>CEDULA/RIF:</b> <code>{esc_xml(inst.cedula_rif)}</code>\n"
+        f"■ <b>CORREO:</b> <code>{esc_xml(inst.correo_electronico or '-')}</code>\n"
         f"■ <b>CONTACTO:</b> <code>{esc_xml(inst.nro_contacto)}</code>\n"
+        f"■ <b>DIRECCION:</b> <code>{esc_xml(inst.direccion_exacta)}</code>\n"
+        f"■ <b>PLAN:</b> {esc_xml(inst.plan_servicio)}\n"
         f"■ <b>DIRECCION:</b> <code>{esc_xml(inst.direccion_exacta)}</code>\n"
         f"■ <b>PLAN:</b> {esc_xml(inst.plan_servicio)}\n"
         f"■ <b>PROMOCION:</b> {esc_xml(inst.promocion)}\n"
@@ -270,3 +275,47 @@ async def listar_pendientes(db: AsyncSession = Depends(get_db)):
     stmt = select(Instalacion).where(Instalacion.status.in_(["PENDIENTE_ASIGNAR", "CONFIGURADO", "EN_RUTA"]))
     res = await db.execute(stmt)
     return [InstalacionOut.model_validate(i) for i in res.scalars().all()]
+
+@router.get("/{id_instalacion}/backup")
+async def descargar_backup_xml(id_instalacion: str, db: AsyncSession = Depends(get_db)):
+    stmt = select(Instalacion).where(Instalacion.id == id_instalacion.upper())
+    res = await db.execute(stmt)
+    inst = res.scalar_one_or_none()
+    if not inst:
+        raise HTTPException(status_code=404, detail="Instalación no encontrada")
+
+    ced_digits = "".join(filter(str.isdigit, str(inst.cedula_rif or "")))
+    num_serv = str(inst.numero_servicio or "1").strip()
+    pppoe = inst.pppoe or (f"VN{ced_digits}-{num_serv}" if ced_digits else "VN00000000-1")
+    serial = inst.serial_onu or inst.id
+    cliente = inst.nombre_cliente or "CLIENTE"
+
+    base_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<OAM_CONFIG>
+  <Dir Name="WAN_CONNECTION_ATTR_TAB">
+    <Value Name="aucUsername" Value="{pppoe}"/>
+    <Value Name="aucPassword" Value="{pppoe}"/>
+    <Value Name="VLANID" Value="100"/>
+    <Value Name="NAT" Value="1"/>
+    <Value Name="ConnectionType" Value="PPPoE"/>
+  </Dir>
+  <Dir Name="DEV_INFO">
+    <Value Name="Serial" Value="{serial}"/>
+    <Value Name="Client" Value="{esc_xml(cliente)}"/>
+    <Value Name="Model" Value="{esc_xml(inst.modelo or 'AX30-H')}"/>
+  </Dir>
+</OAM_CONFIG>"""
+
+    file_name, xml_content = backup_service.generar_xml(
+        pppoe=pppoe,
+        nombre_cliente=cliente,
+        id_instalacion=inst.id,
+        serial_onu=serial,
+        plantilla_xml=base_xml
+    )
+
+    return Response(
+        content=xml_content,
+        media_type="application/xml",
+        headers={"Content-Disposition": f'attachment; filename="{file_name}"'}
+    )
