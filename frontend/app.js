@@ -56,6 +56,7 @@ function checkAuth() {
       if (document.getElementById('vtaAsesor')) {
         document.getElementById('vtaAsesor').value = currentUser.nombre;
       }
+      cargarConfiguracionSistemaAdmin();
       applyRolePermissions();
       return;
     } catch (e) {
@@ -1069,14 +1070,77 @@ async function dictamenEvaluacion(serial, opcion) {
 // ================= PANEL CONFIGURACIÓN GENERAL ADMIN =================
 let adminSettingsCache = {
   nodos: ["NODO CENTRO", "NODO NORTE", "NODO SUR", "NODO ESTE", "NODO OESTE"],
+  planes: ["100M FIBRA", "200M FIBRA", "500M FIBRA", "1GB FIBRA"],
   promociones: [
-    { nombre: "ESTÁNDAR", pasa_por_config: true },
+    { nombre: "PR_OCTUBRE", pasa_por_config: true },
     { nombre: "ESTE ES TU LUGAR", pasa_por_config: true },
-    { nombre: "PROMO 50% DESCUENTO", pasa_por_config: true }
+    { nombre: "PROMO_PLANES", pasa_por_config: true }
   ],
   metodos_pago: ["PAGO MÓVIL", "ZELLE", "TRANSFERENCIA BANCARIA", "EFECTIVO USD", "USDT BINANCE"],
   modelos_equipos: ["AX30-H", "V2801S-B", "AC1200", "WK-3801"]
 };
+
+function actualizarFormulariosConConfigAdmin() {
+  if (!adminSettingsCache) return;
+
+  // 1. Nodos en vtaNodo
+  const vtaNodoSelect = document.getElementById('vtaNodo');
+  if (vtaNodoSelect && Array.isArray(adminSettingsCache.nodos)) {
+    const currentVal = vtaNodoSelect.value;
+    let html = '';
+    adminSettingsCache.nodos.forEach(n => {
+      const val = typeof n === 'string' ? n : (n.nombre || n.val || n);
+      html += `<option value="${val}">${val}</option>`;
+    });
+    vtaNodoSelect.innerHTML = html || '<option value="">Sin nodos</option>';
+    if (currentVal && adminSettingsCache.nodos.includes(currentVal)) {
+      vtaNodoSelect.value = currentVal;
+    }
+  }
+
+  // 2. Planes en vtaPlan
+  const vtaPlanSelect = document.getElementById('vtaPlan');
+  if (vtaPlanSelect && Array.isArray(adminSettingsCache.planes)) {
+    const currentVal = vtaPlanSelect.value;
+    let html = '';
+    adminSettingsCache.planes.forEach(p => {
+      const val = typeof p === 'string' ? p : (p.nombre || p.val || p);
+      html += `<option value="${val}">${val}</option>`;
+    });
+    vtaPlanSelect.innerHTML = html || '<option value="">Sin planes</option>';
+    if (currentVal && adminSettingsCache.planes.includes(currentVal)) {
+      vtaPlanSelect.value = currentVal;
+    }
+  }
+
+  // 3. Promociones en vtaPromo
+  const vtaPromoSelect = document.getElementById('vtaPromo');
+  if (vtaPromoSelect && Array.isArray(adminSettingsCache.promociones)) {
+    const currentVal = vtaPromoSelect.value;
+    let html = '';
+    adminSettingsCache.promociones.forEach(p => {
+      const pNom = typeof p === 'string' ? p : p.nombre;
+      html += `<option value="${pNom}">${pNom}</option>`;
+    });
+    vtaPromoSelect.innerHTML = html || '<option value="">Sin promociones</option>';
+    if (currentVal) {
+      vtaPromoSelect.value = currentVal;
+    }
+  }
+
+  // 4. Modelos de Equipos en recModeloSelect
+  const recModeloSelect = document.getElementById('recModeloSelect');
+  if (recModeloSelect && Array.isArray(adminSettingsCache.modelos_equipos)) {
+    const currentVal = recModeloSelect.value;
+    let html = '<option value="">-- Seleccionar Modelo --</option>';
+    adminSettingsCache.modelos_equipos.forEach(m => {
+      const val = typeof m === 'string' ? m : (m.nombre || m.val || m);
+      html += `<option value="${val}">${val}</option>`;
+    });
+    recModeloSelect.innerHTML = html;
+    if (currentVal) recModeloSelect.value = currentVal;
+  }
+}
 
 async function apiPut(path, body) {
   const headers = { 'Content-Type': 'application/json' };
@@ -1228,6 +1292,9 @@ function renderAdminSettingsUI() {
     });
     containerPagos.innerHTML = html || '<p style="color:var(--muted)">Sin métodos de pago configurados</p>';
   }
+
+  // Sincronizar selectores de todos los formularios de la app
+  actualizarFormulariosConConfigAdmin();
 }
 
 function moverPestanaMenu(idx, dir) {
