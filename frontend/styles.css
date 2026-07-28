@@ -207,6 +207,13 @@ tr:hover { background: var(--hover-row); }
   border-radius: .5rem; border: 1px solid var(--border); z-index: 1100;
   display: none; font-size: .9rem; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
 }
+
+body.light-theme .card,
+body.light-theme .login-card {
+  background: var(--card) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
 .offline-banner {
   background: var(--danger); color: #fff; text-align: center;
   padding: .4rem; font-size: .8rem; display: none;
