@@ -1,5 +1,6 @@
-// ================= CONFIGURACIÓN =================
-const API_URL = 'https://gestor-vn-production.up.railway.app';
+const API_URL = (typeof window !== 'undefined' && window.ENV && window.ENV.API_URL)
+  || (typeof process !== 'undefined' && process.env && (process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL))
+  || 'https://gestor-vn-production.up.railway.app';
 let html5QrCode = null;
 let scanned = [];
 let currentUser = null;
