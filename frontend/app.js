@@ -33,13 +33,17 @@ function renderLogoUI(logoUrl) {
   const img = document.getElementById('appLogoImg');
   const text = document.getElementById('appLogoText');
   const urlInput = document.getElementById('adminLogoUrl');
-  
-  if (logoUrl) {
-    if (img) { img.src = logoUrl; img.style.display = 'inline-block'; }
-    if (urlInput) urlInput.value = logoUrl;
-  } else {
-    if (img) img.style.display = 'none';
+
+  // Si tienes una URL cargada, la muestra; si no, fuerza el uso de tu imagen local 'logo.png'
+  const activeLogo = logoUrl ? logoUrl : 'logo.png';
+
+  if (img) {
+    img.src = activeLogo;
+    img.style.display = 'inline-block'; // Forzamos que siempre esté visible
   }
+  
+  // Opcional: si quieres ocultar el texto "GESTOR-VN" cuando hay logo, déjalo; 
+  // si quieres que aparezcan ambos, comenta o borra la línea que oculta el texto.
 }
 
 // ================= AUTENTICACIÓN =================
