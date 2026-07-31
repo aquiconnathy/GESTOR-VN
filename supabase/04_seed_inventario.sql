@@ -1,5 +1,15 @@
--- Script 04: Migración y Sembrado Inicial de Inventario desde Excel
--- Ejecuta este script en el SQL Editor de tu consola de Supabase
+-- 0. Corregir la función del trigger de auditoría para evitar el error de campo inexistente (NEW.id_venta)
+CREATE OR REPLACE FUNCTION log_auditoria()
+RETURNS TRIGGER AS $$
+DECLARE
+    entity_id TEXT;
+BEGIN
+    entity_id := COALESCE(to_jsonb(NEW)->>'id', to_jsonb(NEW)->>'id_venta', to_jsonb(NEW)->>'serial_pon', 'N/A');
+    INSERT INTO auditoria_eventos (entidad, entidad_id, accion, estado_nuevo, usuario)
+    VALUES (TG_TABLE_NAME, entity_id, TG_OP, row_to_json(NEW)::TEXT, current_user);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
 -- 1. Eliminar restricciones estáticas antiguas de estado y modelo
 ALTER TABLE IF EXISTS equipos DROP CONSTRAINT IF EXISTS equipos_estado_check;
