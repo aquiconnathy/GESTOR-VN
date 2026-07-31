@@ -1,7 +1,11 @@
 -- Script 04: Migración y Sembrado Inicial de Inventario desde Excel
 -- Ejecuta este script en el SQL Editor de tu consola de Supabase
 
--- 1. Asegurar campos adicionales en la tabla equipos
+-- 1. Eliminar restricciones estáticas antiguas de estado y modelo
+ALTER TABLE IF EXISTS equipos DROP CONSTRAINT IF EXISTS equipos_estado_check;
+ALTER TABLE IF EXISTS equipos DROP CONSTRAINT IF EXISTS equipos_modelo_check;
+
+-- 2. Asegurar campos adicionales en la tabla equipos
 ALTER TABLE IF EXISTS equipos ADD COLUMN IF NOT EXISTS cliente_asignado TEXT;
 ALTER TABLE IF EXISTS equipos ADD COLUMN IF NOT EXISTS fecha_instalacion DATE;
 
