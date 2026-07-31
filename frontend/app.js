@@ -686,6 +686,8 @@ async function enviarRecepcion() {
     scanned = [];
     document.getElementById('scannedList').value = '';
     actualizarConteoLista();
+    cargarInventario();
+    cargarEstadisticasDashboard();
   } catch (e) {
     toast('Error guardando recepción: ' + (e.message || e), 'error');
   }

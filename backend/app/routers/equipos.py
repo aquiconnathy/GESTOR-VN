@@ -130,9 +130,11 @@ async def resumen_stock(db: AsyncSession = Depends(get_db)):
         data.setdefault(modelo, {})[estado] = cnt
     return data
 
+@router.get("", response_model=List[EquipoOut])
+@router.get("/", response_model=List[EquipoOut])
 @router.get("/todos", response_model=List[EquipoOut])
 async def listar_todos_equipos(db: AsyncSession = Depends(get_db)):
-    stmt = select(Equipo).order_by(Equipo.created_at.desc())
+    stmt = select(Equipo).order_by(Equipo.id.asc())
     res = await db.execute(stmt)
     return [EquipoOut.model_validate(e) for e in res.scalars().all()]
 
