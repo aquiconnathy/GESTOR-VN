@@ -12,6 +12,8 @@ class EquipoOut(EquipoIn):
     id: str
     estado: str
     fecha_ingreso: datetime
+    cliente_asignado: Optional[str] = None
+    fecha_instalacion: Optional[date] = None
     id_recepcion: Optional[str]
     class Config:
         from_attributes = True

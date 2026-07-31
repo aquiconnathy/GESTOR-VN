@@ -26,6 +26,8 @@ class Equipo(Base):
     marca = Column(String, default="VSOL")
     fecha_ingreso = Column(DateTime(timezone=True), server_default=func.now())
     estado = Column(String, default="DISPONIBLE")
+    cliente_asignado = Column(Text)
+    fecha_instalacion = Column(Date)
     id_recepcion = Column(String, ForeignKey("recepciones.id"))
     id_instalacion = Column(String)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
