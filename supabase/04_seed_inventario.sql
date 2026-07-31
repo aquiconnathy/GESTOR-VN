@@ -9,7 +9,19 @@ ALTER TABLE IF EXISTS equipos DROP CONSTRAINT IF EXISTS equipos_modelo_check;
 ALTER TABLE IF EXISTS equipos ADD COLUMN IF NOT EXISTS cliente_asignado TEXT;
 ALTER TABLE IF EXISTS equipos ADD COLUMN IF NOT EXISTS fecha_instalacion DATE;
 
--- 2. Carga e inserción masiva de los equipos existentes
+-- 3. Pre-cargar recepciones históricas (REC_001 a REC_007) para cumplir la clave foránea (Foreign Key)
+INSERT INTO recepciones (id, fecha_ingreso, entrega, recibe, observaciones, cantidad, cant_ax, cant_onu, cant_ac, estado)
+VALUES
+  ('REC_001', '2026-07-02', 'Proveedor Excel', 'Almacén', 'Carga Inicial Excel', 3, 3, 0, 0, 'COMPLETADA'),
+  ('REC_002', '2026-07-03', 'Proveedor Excel', 'Almacén', 'Carga Inicial Excel', 21, 16, 5, 0, 'COMPLETADA'),
+  ('REC_003', '2026-06-19', 'Proveedor Excel', 'Almacén', 'Carga Inicial Excel', 6, 1, 5, 0, 'COMPLETADA'),
+  ('REC_004', '2026-07-10', 'Proveedor Excel', 'Almacén', 'Carga Inicial Excel', 16, 15, 0, 1, 'COMPLETADA'),
+  ('REC_005', '2026-07-18', 'Proveedor Excel', 'Almacén', 'Carga Inicial Excel', 1, 0, 1, 0, 'COMPLETADA'),
+  ('REC_006', '2026-07-20', 'Proveedor Excel', 'Almacén', 'Carga Inicial Excel', 21, 16, 5, 0, 'COMPLETADA'),
+  ('REC_007', '2026-07-28', 'Proveedor Excel', 'Almacén', 'Carga Inicial Excel', 10, 10, 0, 0, 'COMPLETADA')
+ON CONFLICT (id) DO NOTHING;
+
+-- 4. Carga e inserción masiva de los equipos existentes
 INSERT INTO equipos (id, serial_pon, modelo, marca, fecha_ingreso, estado, cliente_asignado, id_instalacion, id_recepcion, fecha_instalacion)
 VALUES
   ('AX_001', 'VSOL005F3412', 'AX30-H', 'VSOL', '2026-07-02', 'INSTALADO', 'Dhamelis Daniela Gómez Salina', 'INS_002', 'REC_001', '2026-07-14'),
@@ -98,9 +110,10 @@ ON CONFLICT (serial_pon) DO UPDATE SET
   id_recepcion = EXCLUDED.id_recepcion,
   fecha_instalacion = EXCLUDED.fecha_instalacion;
 
--- 3. Actualizar la secuencia del correlativo en config_system
+-- 5. Actualizar la secuencia de los correlativos en config_system
 INSERT INTO config_system (key, value_int)
 VALUES
+  ('seq_recepcion', 7),
   ('seq_eq_ax', 59),
   ('seq_eq_onu', 16),
   ('seq_eq_ac', 1)
