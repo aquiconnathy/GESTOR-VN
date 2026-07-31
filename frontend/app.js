@@ -106,18 +106,18 @@ function applyRolePermissions(rol, switchTab = false) {
   
   // Mapa de visibilidad de pestañas según ROL
   const permissions = {
-    ADMIN: ['dashboard', 'ventas', 'recepcion', 'instalaciones', 'despacho', 'config', 'evaluacion', 'admin-config'],
-    ASESOR: ['dashboard', 'ventas'],
-    ALMACEN: ['dashboard', 'recepcion', 'despacho', 'evaluacion'],
-    CONFIGURADOR: ['dashboard', 'config', 'instalaciones', 'evaluacion'],
-    INSTALADOR: ['dashboard', 'instalaciones', 'despacho']
+    ADMIN: ['dashboard', 'ventas', 'recepcion', 'inventario', 'instalaciones', 'despacho', 'config', 'evaluacion', 'admin-config'],
+    ASESOR: ['dashboard', 'ventas', 'inventario'],
+    ALMACEN: ['dashboard', 'recepcion', 'inventario', 'despacho', 'evaluacion'],
+    CONFIGURADOR: ['dashboard', 'config', 'inventario', 'instalaciones', 'evaluacion'],
+    INSTALADOR: ['dashboard', 'instalaciones', 'inventario', 'despacho']
   };
 
-  const allowedViews = permissions[rol] || ['dashboard', 'ventas'];
+  const allowedViews = permissions[rol] || ['dashboard', 'ventas', 'inventario'];
   
   // Reordenar botones en el DOM según el orden guardado
   const navContainer = document.getElementById('mainNav');
-  const savedOrder = adminSettingsCache.menu_orden || ['dashboard', 'ventas', 'recepcion', 'instalaciones', 'despacho', 'config', 'evaluacion', 'admin-config'];
+  const savedOrder = adminSettingsCache.menu_orden || ['dashboard', 'ventas', 'recepcion', 'inventario', 'instalaciones', 'despacho', 'config', 'evaluacion', 'admin-config'];
   
   if (navContainer) {
     savedOrder.forEach(v => {
@@ -170,6 +170,7 @@ function showView(id) {
   }
 
   if (id === 'dashboard') cargarEstadisticasDashboard();
+  if (id === 'inventario') cargarInventario();
   if (id === 'instalaciones') cargarPendientes();
   if (id === 'ventas') cargarVentas();
   if (id === 'evaluacion') cargarEquiposEvaluacion();
@@ -1563,4 +1564,109 @@ async function procesarTextoEImportar(tipo, textContent) {
   } catch (err) {
     toast('Error importando datos: ' + err.message, 'error');
   }
+}
+
+// ================= MÓDULO DE INVENTARIO GENERAL =================
+let inventarioCache = [];
+
+async function cargarInventario() {
+  const container = document.getElementById('tablaInventarioContainer');
+  if (!container) return;
+  container.innerHTML = '<p style="color:var(--muted); padding:1rem">⏳ Cargando datos de inventario desde Supabase...</p>';
+
+  try {
+    const data = await apiGet('/equipos');
+    inventarioCache = Array.isArray(data) ? data : [];
+
+    // Actualizar métricas
+    const total = inventarioCache.length;
+    const disponibles = inventarioCache.filter(e => (e.estado || '').toUpperCase() === 'DISPONIBLE').length;
+    const reservados = inventarioCache.filter(e => ['RESERVADO', 'ASIGNADO', 'EN_RUTA'].includes((e.estado || '').toUpperCase())).length;
+    const instalados = inventarioCache.filter(e => (e.estado || '').toUpperCase() === 'INSTALADO').length;
+
+    if (document.getElementById('invStatTotal')) document.getElementById('invStatTotal').textContent = total;
+    if (document.getElementById('invStatDisponibles')) document.getElementById('invStatDisponibles').textContent = disponibles;
+    if (document.getElementById('invStatReservados')) document.getElementById('invStatReservados').textContent = reservados;
+    if (document.getElementById('invStatInstalados')) document.getElementById('invStatInstalados').textContent = instalados;
+
+    filtrarInventario();
+  } catch (err) {
+    container.innerHTML = `<p style="color:var(--error); padding:1rem">❌ Error al cargar inventario: ${err.message}</p>`;
+  }
+}
+
+function filtrarInventario() {
+  const container = document.getElementById('tablaInventarioContainer');
+  if (!container) return;
+
+  const search = (document.getElementById('invSearchInput')?.value || '').toLowerCase().trim();
+  const estadoFiltro = (document.getElementById('invFiltroEstado')?.value || 'TODOS').toUpperCase();
+  const modeloFiltro = (document.getElementById('invFiltroModelo')?.value || 'TODOS').toUpperCase();
+
+  const filtrados = inventarioCache.filter(item => {
+    const textMatch = !search || 
+      (item.id || '').toLowerCase().includes(search) ||
+      (item.serial_pon || '').toLowerCase().includes(search) ||
+      (item.modelo || '').toLowerCase().includes(search) ||
+      (item.cliente_asignado || '').toLowerCase().includes(search);
+
+    const est = (item.estado || '').toUpperCase();
+    let estadoMatch = true;
+    if (estadoFiltro === 'DISPONIBLE') estadoMatch = est === 'DISPONIBLE';
+    else if (estadoFiltro === 'RESERVADO') estadoMatch = ['RESERVADO', 'ASIGNADO'].includes(est);
+    else if (estadoFiltro === 'EN_RUTA') estadoMatch = est === 'EN_RUTA';
+    else if (estadoFiltro === 'INSTALADO') estadoMatch = est === 'INSTALADO';
+    else if (estadoFiltro === 'GARANTIA') estadoMatch = est.includes('GARANTIA');
+
+    const mod = (item.modelo || '').toUpperCase();
+    const modeloMatch = modeloFiltro === 'TODOS' || mod.includes(modeloFiltro);
+
+    return textMatch && estadoMatch && modeloMatch;
+  });
+
+  if (filtrados.length === 0) {
+    container.innerHTML = '<p style="color:var(--muted); padding:1.5rem; text-align:center">No se encontraron equipos con los criterios de búsqueda.</p>';
+    return;
+  }
+
+  let html = `<table>
+    <thead>
+      <tr>
+        <th>ID Equipo</th>
+        <th>Serial PON</th>
+        <th>Modelo</th>
+        <th>Marca</th>
+        <th>Estado</th>
+        <th>Cliente Asignado</th>
+        <th>Fecha Ingreso</th>
+        <th>Fecha Inst.</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  filtrados.forEach(e => {
+    let badgeClass = 'badge-secondary';
+    const st = (e.estado || '').toUpperCase();
+    if (st === 'DISPONIBLE') badgeClass = 'badge-success';
+    else if (['RESERVADO', 'ASIGNADO', 'EN_RUTA'].includes(st)) badgeClass = 'badge-warning';
+    else if (st === 'INSTALADO') badgeClass = 'badge-primary';
+    else if (st.includes('GARANTIA')) badgeClass = 'badge-danger';
+
+    const fechaIng = e.fecha_ingreso ? e.fecha_ingreso.split('T')[0] : '-';
+    const fechaInst = e.fecha_instalacion ? e.fecha_instalacion.split('T')[0] : '-';
+
+    html += `<tr>
+      <td><strong>${e.id || '-'}</strong></td>
+      <td><code>${e.serial_pon || '-'}</code></td>
+      <td>${e.modelo || '-'}</td>
+      <td>${e.marca || 'VSOL'}</td>
+      <td><span class="badge ${badgeClass}">${st}</span></td>
+      <td>${e.cliente_asignado || '-'}</td>
+      <td>${fechaIng}</td>
+      <td>${fechaInst}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
 }

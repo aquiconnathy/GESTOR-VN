@@ -63,6 +63,7 @@
           <button id="nav-dashboard" class="active" onclick="showView('dashboard')">📊 Dashboard</button>
           <button id="nav-ventas" onclick="showView('ventas')">🛒 Ventas</button>
           <button id="nav-recepcion" onclick="showView('recepcion')">📥 Recepción</button>
+          <button id="nav-inventario" onclick="showView('inventario')">📦 Inventario</button>
           <button id="nav-instalaciones" onclick="showView('instalaciones')">📋 Instalaciones</button>
           <button id="nav-despacho" onclick="showView('despacho')">🚚 Despacho</button>
           <button id="nav-config" onclick="showView('config')">⚙️ Configurar</button>
@@ -254,6 +255,67 @@
           <input type="text" id="recObs" placeholder="Opcional...">
           
           <button type="button" class="btn success" style="margin-top:1.2rem; font-size:1rem" onclick="enviarRecepcion()">💾 Confirmar y Guardar Recepción</button>
+        </div>
+      </section>
+
+      <!-- INVENTARIO COMPLETO DE EQUIPOS -->
+      <section id="view-inventario" class="view">
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem">
+            <h2>📦 Inventario General de Equipos</h2>
+            <button class="btn success" style="width:auto; padding:.4rem .9rem; margin:0" onclick="cargarInventario()">🔄 Actualizar Inventario</button>
+          </div>
+
+          <!-- TARJETAS DE MÉTRICAS DE STOCK -->
+          <div class="grid-4" style="margin:1rem 0">
+            <div class="card" style="margin:0; text-align:center; padding:.8rem; background:#1e293b">
+              <span style="font-size:.8rem; color:var(--muted)">Total Registrados</span>
+              <h3 id="invStatTotal" style="font-size:1.6rem; color:var(--accent); margin-top:.2rem">0</h3>
+            </div>
+            <div class="card" style="margin:0; text-align:center; padding:.8rem; background:#1e293b">
+              <span style="font-size:.8rem; color:var(--muted)">Disponibles (Stock)</span>
+              <h3 id="invStatDisponibles" style="font-size:1.6rem; color:var(--success); margin-top:.2rem">0</h3>
+            </div>
+            <div class="card" style="margin:0; text-align:center; padding:.8rem; background:#1e293b">
+              <span style="font-size:.8rem; color:var(--muted)">Reservados / En Ruta</span>
+              <h3 id="invStatReservados" style="font-size:1.6rem; color:#f59e0b; margin-top:.2rem">0</h3>
+            </div>
+            <div class="card" style="margin:0; text-align:center; padding:.8rem; background:#1e293b">
+              <span style="font-size:.8rem; color:var(--muted)">Instalados</span>
+              <h3 id="invStatInstalados" style="font-size:1.6rem; color:#3b82f6; margin-top:.2rem">0</h3>
+            </div>
+          </div>
+
+          <!-- CONTROLES DE BÚSQUEDA Y FILTRADO -->
+          <div class="grid-3" style="margin-bottom:1rem">
+            <div>
+              <label>🔍 Buscar por Serial / ID / Cliente</label>
+              <input type="text" id="invSearchInput" placeholder="Ej: VSOL005F3412, AX_001, Gómez..." onkeyup="filtrarInventario()">
+            </div>
+            <div>
+              <label>Filtro por Estado</label>
+              <select id="invFiltroEstado" onchange="filtrarInventario()">
+                <option value="TODOS">Todos los Estados</option>
+                <option value="DISPONIBLE">🟢 DISPONIBLE</option>
+                <option value="RESERVADO">🟡 RESERVADO / ASIGNADO</option>
+                <option value="EN_RUTA">🚚 EN RUTA</option>
+                <option value="INSTALADO">🔵 INSTALADO</option>
+                <option value="GARANTIA">🔴 GARANTIA</option>
+              </select>
+            </div>
+            <div>
+              <label>Filtro por Modelo</label>
+              <select id="invFiltroModelo" onchange="filtrarInventario()">
+                <option value="TODOS">Todos los Modelos</option>
+                <option value="AX30-H">AX30-H</option>
+                <option value="V2801S-B">V2801S-B</option>
+                <option value="AC1200">AC1200</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- TABLA DE INVENTARIO -->
+          <div id="tablaInventarioContainer" style="overflow-x:auto"></div>
         </div>
       </section>
 
