@@ -1,5 +1,7 @@
 # Especificación Técnica: Flujo Automatizado de Ventas, Reserva de Inventario, Administración y Aprovisionamiento por SSH
 
+![Diagrama Visual del Flujo](wisp_workflow_diagram.jpg)
+
 Este documento especifica la arquitectura y el flujo de trabajo punta a punta para la integración de **Ventas**, **WISP API**, **Reserva de Inventario**, **Aprobación Administrativa** e **Instalación Técnica con Aprovisionamiento SSH**. 
 
 ---
