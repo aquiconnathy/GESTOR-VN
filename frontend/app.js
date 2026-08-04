@@ -635,28 +635,130 @@ function actualizarConteoLista() {
   document.getElementById('scanCount').textContent = scanned.length;
 }
 
-// ================= CÁMARA Y ESCÁNER 1D/2D =================
+// ================= CÁMARA Y ESCÁNER NATIVO =================
+let nativeScannerStream = null;
+let nativeScannerInterval = null;
+
 function toggleScanner() {
   const reader = document.getElementById('reader');
   if (!reader) return;
   
+  // Si ya está activo, cerrar
   if (reader.style.display === 'block') {
-    reader.style.display = 'none';
-    if (html5QrCode) {
-      html5QrCode.stop().then(() => { html5QrCode = null; }).catch(() => { html5QrCode = null; });
-    }
+    stopNativeScanner(reader);
     return;
   }
 
   reader.style.display = 'block';
   setScanStatus('Solicitando acceso a la cámara...');
 
+  // Intentar API nativa BarcodeDetector (Chrome Android 83+)
+  if ('BarcodeDetector' in window) {
+    startNativeScanner(reader);
+  } else {
+    // Fallback a html5-qrcode
+    startHtml5Scanner(reader);
+  }
+}
+
+function stopNativeScanner(reader) {
+  reader.style.display = 'none';
+  
+  if (nativeScannerInterval) {
+    clearInterval(nativeScannerInterval);
+    nativeScannerInterval = null;
+  }
+  if (nativeScannerStream) {
+    nativeScannerStream.getTracks().forEach(t => t.stop());
+    nativeScannerStream = null;
+  }
+  if (html5QrCode) {
+    html5QrCode.stop().then(() => { html5QrCode = null; }).catch(() => { html5QrCode = null; });
+  }
+  reader.innerHTML = '';
+}
+
+async function startNativeScanner(reader) {
+  try {
+    const detector = new BarcodeDetector({
+      formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code']
+    });
+
+    // Crear video element
+    reader.innerHTML = '';
+    const video = document.createElement('video');
+    video.setAttribute('playsinline', '');
+    video.setAttribute('autoplay', '');
+    video.style.cssText = 'width:100%; height:auto; border-radius:0.5rem; display:block;';
+    
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:280px; height:100px; border:2px solid #00ff88; border-radius:8px; pointer-events:none; z-index:10; box-shadow: 0 0 0 2000px rgba(0,0,0,0.3);';
+    
+    const label = document.createElement('div');
+    label.textContent = '📷 Centra el código de barras aquí';
+    label.style.cssText = 'position:absolute; bottom:8px; left:50%; transform:translateX(-50%); color:#00ff88; font-size:0.7rem; font-weight:700; white-space:nowrap; z-index:11; text-shadow: 0 1px 3px rgba(0,0,0,0.8);';
+
+    reader.style.position = 'relative';
+    reader.appendChild(video);
+    reader.appendChild(overlay);
+    reader.appendChild(label);
+
+    // Solicitar cámara HD
+    nativeScannerStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'environment',
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    });
+    video.srcObject = nativeScannerStream;
+    await video.play();
+
+    setScanStatus('📷 Escáner NATIVO activo - Enfoca el código de barras');
+
+    // Escanear cada 300ms
+    let lastDetected = '';
+    let lastDetectedTime = 0;
+    nativeScannerInterval = setInterval(async () => {
+      try {
+        if (video.readyState < video.HAVE_ENOUGH_DATA) return;
+        const barcodes = await detector.detect(video);
+        if (barcodes.length > 0) {
+          const now = Date.now();
+          const value = barcodes[0].rawValue;
+          // Evitar duplicados rápidos del mismo código
+          if (value !== lastDetected || (now - lastDetectedTime) > 3000) {
+            lastDetected = value;
+            lastDetectedTime = now;
+            console.log('✅ NATIVO DETECTADO:', value, barcodes[0].format);
+            processBarcodeResult(value);
+          }
+        }
+      } catch (e) {
+        // silencioso
+      }
+    }, 300);
+
+  } catch (err) {
+    console.error('Error escáner nativo:', err);
+    setScanStatus('⚠️ Escáner nativo falló, intentando alternativo...');
+    // Fallback
+    startHtml5Scanner(reader);
+  }
+}
+
+function startHtml5Scanner(reader) {
   if (typeof Html5Qrcode === 'undefined') {
     setScanStatus('⚠️ Librería de cámara no disponible', true);
     return;
   }
 
   try {
+    reader.innerHTML = '';
+    const scanDiv = document.createElement('div');
+    scanDiv.id = 'reader-inner';
+    reader.appendChild(scanDiv);
+
     let formats = undefined;
     if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
       formats = [
@@ -667,36 +769,18 @@ function toggleScanner() {
       ];
     }
 
-    const constructorOptions = formats 
-      ? { formatsToSupport: formats, verbose: true } 
-      : { verbose: true };
-    html5QrCode = new Html5Qrcode("reader", constructorOptions);
-
-    const startConfig = {
-      fps: 10,
-      qrbox: { width: 280, height: 100 },
-      videoConstraints: {
-        facingMode: "environment",
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      }
-    };
+    const opts = formats ? { formatsToSupport: formats, verbose: false } : { verbose: false };
+    html5QrCode = new Html5Qrcode("reader-inner", opts);
 
     html5QrCode.start(
       { facingMode: "environment" },
-      startConfig,
-      (decodedText, decodedResult) => {
-        console.log('✅ BARCODE DETECTADO:', decodedText, decodedResult);
-        processBarcodeResult(decodedText);
-      },
-      (errorMessage) => {
-        // silencioso - no hacer nada en errores de escaneo continuo
-      }
+      { fps: 10, qrbox: { width: 280, height: 100 } },
+      (decodedText) => { processBarcodeResult(decodedText); },
+      () => {}
     ).then(() => {
-      setScanStatus('📷 Cámara HD activa - Enfoca el código de barras dentro del recuadro');
+      setScanStatus('📷 Cámara activa - Enfoca el código de barras');
     }).catch(err => {
-      console.error('Error cámara:', err);
-      setScanStatus('❌ Error al abrir cámara: ' + (err.message || err), true);
+      setScanStatus('❌ Error: ' + (err.message || err), true);
       html5QrCode = null;
     });
   } catch (err) {
