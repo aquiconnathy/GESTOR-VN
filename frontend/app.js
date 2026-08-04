@@ -662,34 +662,40 @@ function toggleScanner() {
       formats = [
         Html5QrcodeSupportedFormats.CODE_128,
         Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.CODE_93,
         Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.QR_CODE,
-        Html5QrcodeSupportedFormats.DATA_MATRIX
+        Html5QrcodeSupportedFormats.QR_CODE
       ];
     }
 
-    const constructorOptions = formats ? { formatsToSupport: formats, verbose: false } : { verbose: false };
+    const constructorOptions = formats 
+      ? { formatsToSupport: formats, verbose: true } 
+      : { verbose: true };
     html5QrCode = new Html5Qrcode("reader", constructorOptions);
 
     const startConfig = {
-      fps: 25,
-      qrbox: { width: 280, height: 130 },
-      aspectRatio: 1.777778,
-      experimentalFeatures: {
-        useBarCodeDetectorIfSupported: true
+      fps: 10,
+      qrbox: { width: 280, height: 100 },
+      videoConstraints: {
+        facingMode: "environment",
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
       }
     };
 
     html5QrCode.start(
       { facingMode: "environment" },
       startConfig,
-      processBarcodeResult,
-      () => {}
+      (decodedText, decodedResult) => {
+        console.log('✅ BARCODE DETECTADO:', decodedText, decodedResult);
+        processBarcodeResult(decodedText);
+      },
+      (errorMessage) => {
+        // silencioso - no hacer nada en errores de escaneo continuo
+      }
     ).then(() => {
-      setScanStatus('📷 Cámara activa - Apunta al código de barras VSOL');
+      setScanStatus('📷 Cámara HD activa - Enfoca el código de barras dentro del recuadro');
     }).catch(err => {
+      console.error('Error cámara:', err);
       setScanStatus('❌ Error al abrir cámara: ' + (err.message || err), true);
       html5QrCode = null;
     });
