@@ -703,6 +703,19 @@
             <div id="adminListaMetodosPago" style="display:flex; flex-wrap:wrap; gap:.5rem"></div>
           </div>
 
+          <!-- PREFIJOS DE SERIALES POR MARCA (VSOL, HWTC, ZTEG, FHTT, TPLK, MKTK) -->
+          <div style="margin-bottom:1.5rem">
+            <h3 style="margin:0 0 .3rem 0; color:var(--accent)">🏷️ Prefijos de Seriales Reconocidos por Marca (Escáner)</h3>
+            <p style="font-size:.8rem; color:var(--muted); margin-bottom:.5rem">
+              Configura los prefijos con los que comienzan los seriales PON/SN de cada fabricante (ej: VSOL, HWTC, ZTEG, FHTT, TPLK) para que la cámara y el lector los extraigan automáticamente de cualquier router:
+            </p>
+            <div style="display:flex; gap:.5rem; margin-bottom:.5rem">
+              <input type="text" id="adminNuevoPrefijoSerial" placeholder="Ej: HWTC, ZTEG, FHTT, TPLK..." style="flex:1; text-transform:uppercase">
+              <button type="button" class="btn success" style="width:auto; padding:0 1rem; margin:0" onclick="agregarPrefijoSerialAdmin()">+ Agregar</button>
+            </div>
+            <div id="adminListaPrefijosSeriales" style="display:flex; flex-wrap:wrap; gap:.5rem"></div>
+          </div>
+
           <button type="button" class="btn success" style="font-size:1rem" onclick="guardarConfiguracionSistemaAdmin()">💾 Guardar Ajustes Globales en Base de Datos</button>
         </div>
 
@@ -772,6 +785,6 @@ Juan Perez, V12345678, 04141234567, NODO CENTRO, PLAN 100 MEGA FIBRA, ESTANDAR">
   </div>
 
   <div id="toast"></div>
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

@@ -852,20 +852,48 @@ function eliminarSerialEscaneado(modelo, serial) {
   }
 }
 
-// --- RECEPCIÓN Y ESCANEO DE SERIALES ---
+// --- RECEPCIÓN Y ESCANEO DE SERIALES POR PREFIJO ---
+function obtenerPrefijosSerialesConfigurados() {
+  if (adminSettingsCache && Array.isArray(adminSettingsCache.prefijos_seriales) && adminSettingsCache.prefijos_seriales.length) {
+    return adminSettingsCache.prefijos_seriales;
+  }
+  return ['VSOL', 'HWTC', 'ZTEG', 'FHTT', 'TPLK', 'MKTK', 'MRCS'];
+}
+
+function extraerSerialLimpio(raw) {
+  if (!raw) return '';
+  const txt = raw.trim();
+  const prefijos = obtenerPrefijosSerialesConfigurados();
+
+  // 1. Intentar hacer match con cualquier prefijo de marca configurado (ej: VSOL, HWTC, ZTEG, etc.)
+  const escapedPref = prefijos.map(p => p.trim().toUpperCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).filter(Boolean);
+  if (escapedPref.length > 0) {
+    const regexPrefijos = new RegExp(`(${escapedPref.join('|')})[A-Z0-9]{4,28}`, 'i');
+    const match = txt.match(regexPrefijos);
+    if (match && match[0]) {
+      return match[0].toUpperCase();
+    }
+  }
+
+  // 2. Si no coincide con un prefijo conocido, limpiar prefijos estándar de etiqueta (SN:, MAC:, S/N:)
+  let cleaned = txt
+    .replace(/^(SN|S\/N|PON\s*S\/N|PON|MAC|GPON|FSN|DEV):\s*/i, '')
+    .replace(/[\r\n\t\s]/g, '')
+    .toUpperCase();
+
+  if (/^[A-Z0-9\-\_]{6,32}$/.test(cleaned)) {
+    return cleaned;
+  }
+
+  return '';
+}
+
 function processBarcodeResult(decodedText) {
   if (!decodedText) return;
-  
-  let raw = decodedText.trim();
-  
-  // Extraer SOLO el serial VSOL del texto decodificado
-  const vsolMatch = raw.match(/(VSOL[A-Z0-9]{4,24})/i);
-  if (!vsolMatch || !vsolMatch[1]) {
-    return;
+  const serial = extraerSerialLimpio(decodedText);
+  if (serial) {
+    procesarIngresoSerial(serial);
   }
-  
-  const serial = vsolMatch[1].toUpperCase();
-  procesarIngresoSerial(serial);
 }
 
 function handleFastInput(e) {
@@ -878,18 +906,8 @@ function handleFastInput(e) {
 function agregarSerialManual() {
   const input = document.getElementById('fastSerialInput');
   if (!input) return;
-  let val = input.value.trim().toUpperCase();
-  
-  const vsolMatch = val.match(/(VSOL[A-Z0-9]{4,24})/i);
-  if (vsolMatch && vsolMatch[1]) {
-    val = vsolMatch[1];
-  } else {
-    val = val
-      .replace(/^(SN|S\/N|PON\s*S\/N|PON|MAC|GPON|FSN|DEV):\s*/i, '')
-      .replace(/[\r\n\t\s]/g, '');
-  }
-    
-  if (!val) return;
+  const val = extraerSerialLimpio(input.value);
+  if (!val) return toast('Serial no válido o no reconocido', 'error');
 
   const exito = procesarIngresoSerial(val);
   if (exito) {
@@ -1786,6 +1804,18 @@ function renderAdminSettingsUI() {
     containerPagos.innerHTML = html || '<p style="color:var(--muted)">Sin métodos de pago configurados</p>';
   }
 
+  const containerPrefijos = document.getElementById('adminListaPrefijosSeriales');
+  if (containerPrefijos) {
+    if (!adminSettingsCache.prefijos_seriales || !adminSettingsCache.prefijos_seriales.length) {
+      adminSettingsCache.prefijos_seriales = ['VSOL', 'HWTC', 'ZTEG', 'FHTT', 'TPLK', 'MKTK'];
+    }
+    let html = '';
+    adminSettingsCache.prefijos_seriales.forEach((p, idx) => {
+      html += `<span class="badge" style="background:#1e3a8a; font-size:.85rem; padding:.3rem .6rem; color:#93c5fd">${p} <b style="cursor:pointer; color:#ef4444; margin-left:.4rem" onclick="eliminarPrefijoSerialAdmin(${idx})">×</b></span>`;
+    });
+    containerPrefijos.innerHTML = html || '<p style="color:var(--muted)">Sin prefijos configurados</p>';
+  }
+
   // Sincronizar selectores de todos los formularios de la app
   actualizarFormulariosConConfigAdmin();
 }
@@ -1862,6 +1892,29 @@ function agregarMetodoPagoAdmin() {
 function eliminarMetodoPagoAdmin(idx) {
   adminSettingsCache.metodos_pago.splice(idx, 1);
   renderAdminSettingsUI();
+}
+
+function agregarPrefijoSerialAdmin() {
+  const input = document.getElementById('adminNuevoPrefijoSerial');
+  if (!input) return;
+  const val = input.value.trim().toUpperCase();
+  if (!val) return;
+  if (!adminSettingsCache.prefijos_seriales) {
+    adminSettingsCache.prefijos_seriales = ['VSOL', 'HWTC', 'ZTEG', 'FHTT', 'TPLK', 'MKTK'];
+  }
+  if (!adminSettingsCache.prefijos_seriales.includes(val)) {
+    adminSettingsCache.prefijos_seriales.push(val);
+    renderAdminSettingsUI();
+    toast(`✅ Prefijo ${val} añadido a la lista del escáner`);
+  }
+  input.value = '';
+}
+
+function eliminarPrefijoSerialAdmin(idx) {
+  if (adminSettingsCache.prefijos_seriales) {
+    adminSettingsCache.prefijos_seriales.splice(idx, 1);
+    renderAdminSettingsUI();
+  }
 }
 
 async function guardarConfiguracionSistemaAdmin() {
