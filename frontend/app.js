@@ -538,6 +538,7 @@ function getModeloActivo() {
     return input && input.value.trim() ? input.value.trim().toUpperCase() : 'NUEVO_MODELO';
   }
   return sel.value;
+}
 // ================= WIZARD DE RECEPCIÓN (2 PASOS) =================
 let loteConfig = {
   proveedor: '',
