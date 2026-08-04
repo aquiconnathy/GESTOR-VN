@@ -87,7 +87,8 @@ async def importar_equipos_masivo(data: ImportarEquiposIn, db: AsyncSession = De
         res = await db.execute(stmt)
         eq = res.scalar_one_or_none()
         if not eq:
-            id_eq = f"EQ_IMP_{serial[-6:]}"
+            seq_key = f"seq_eq_{modelo.lower().replace('-','_').replace(' ','_')}"
+            id_eq = await next_seq(db, seq_key, "EQ_", 3)
             eq = Equipo(id=id_eq, serial_pon=serial, modelo=modelo, marca=marca, estado=estado)
             db.add(eq)
         else:
