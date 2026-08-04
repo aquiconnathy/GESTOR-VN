@@ -554,10 +554,18 @@ function handleModeloChange(selectEl) {
 function processBarcodeResult(decodedText) {
   if (!decodedText) return;
   
-  let raw = decodedText.trim()
-    .replace(/^(SN|S\/N|PON S\/N|PON|MAC):\s*/i, '')
-    .replace(/[\r\n\t\s]/g, '')
-    .toUpperCase();
+  let raw = decodedText.trim();
+  
+  // Extraer el serial VSOL directamente si está presente en el texto decodificado
+  const vsolMatch = raw.match(/(VSOL[A-Z0-9]{4,24})/i);
+  if (vsolMatch && vsolMatch[1]) {
+    raw = vsolMatch[1].toUpperCase();
+  } else {
+    raw = raw
+      .replace(/^(SN|S\/N|PON\s*S\/N|PON|MAC|GPON|FSN|DEV):\s*/i, '')
+      .replace(/[\r\n\t\s]/g, '')
+      .toUpperCase();
+  }
 
   if (/^[A-Z0-9\-\_]{4,32}$/.test(raw)) {
     const serial = raw;
@@ -585,10 +593,17 @@ function handleFastInput(e) {
 function agregarSerialManual() {
   const input = document.getElementById('fastSerialInput');
   if (!input) return;
-  let val = input.value.trim()
-    .replace(/^(SN|S\/N|PON S\/N|PON|MAC):\s*/i, '')
-    .replace(/[\r\n\t\s]/g, '')
-    .toUpperCase();
+  let val = input.value.trim();
+  
+  const vsolMatch = val.match(/(VSOL[A-Z0-9]{4,24})/i);
+  if (vsolMatch && vsolMatch[1]) {
+    val = vsolMatch[1].toUpperCase();
+  } else {
+    val = val
+      .replace(/^(SN|S\/N|PON\s*S\/N|PON|MAC|GPON|FSN|DEV):\s*/i, '')
+      .replace(/[\r\n\t\s]/g, '')
+      .toUpperCase();
+  }
     
   if (!val) return;
 
@@ -620,7 +635,7 @@ function actualizarConteoLista() {
   document.getElementById('scanCount').textContent = scanned.length;
 }
 
-// ================= CÁMARA =================
+// ================= CÁMARA Y ESCÁNER 1D/2D =================
 function toggleScanner() {
   const reader = document.getElementById('reader');
   if (!reader) return;
@@ -642,14 +657,37 @@ function toggleScanner() {
   }
 
   try {
+    const config = {
+      fps: 25,
+      qrbox: (viewfinderWidth, viewfinderHeight) => ({
+        width: Math.floor(Math.min(viewfinderWidth * 0.85, 320)),
+        height: Math.floor(Math.min(viewfinderHeight * 0.5, 180))
+      }),
+      experimentalFeatures: {
+        useBarCodeDetectorIfSupported: true
+      }
+    };
+
+    if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+      config.formatsToSupport = [
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.DATA_MATRIX
+      ];
+    }
+
     html5QrCode = new Html5Qrcode("reader");
     html5QrCode.start(
       { facingMode: "environment" },
-      { fps: 15, qrbox: { width: 280, height: 100 } },
+      config,
       processBarcodeResult,
       () => {}
     ).then(() => {
-      setScanStatus('📷 Cámara activa - Apunta al código');
+      setScanStatus('📷 Cámara activa - Apunta al código de barras VSOL');
     }).catch(err => {
       setScanStatus('❌ Error al abrir cámara: ' + (err.message || err), true);
       html5QrCode = null;
