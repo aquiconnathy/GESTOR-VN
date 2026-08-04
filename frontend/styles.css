@@ -160,10 +160,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); bo
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
 .scanner-box {
-  width: 100%; height: 220px; background: #000; border-radius: .5rem;
-  overflow: hidden; margin: .5rem 0; position: relative;
+  width: 100%; min-height: 250px; max-height: 400px; background: #000; border-radius: .5rem;
+  overflow: hidden; margin: .5rem 0; position: relative; border: 1px solid var(--accent);
 }
-#reader video { object-fit: cover; }
+#reader video { width: 100% !important; height: auto !important; object-fit: contain !important; }
 
 table { width: 100%; border-collapse: collapse; font-size: .8rem; }
 th, td { padding: .6rem .5rem; text-align: left; border-bottom: 1px solid var(--border); }

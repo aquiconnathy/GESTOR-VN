@@ -675,10 +675,8 @@ function toggleScanner() {
 
     const startConfig = {
       fps: 25,
-      qrbox: (viewfinderWidth, viewfinderHeight) => ({
-        width: Math.floor(Math.min(viewfinderWidth * 0.9, 320)),
-        height: Math.floor(Math.min(viewfinderHeight * 0.45, 140))
-      }),
+      qrbox: { width: 280, height: 130 },
+      aspectRatio: 1.777778,
       experimentalFeatures: {
         useBarCodeDetectorIfSupported: true
       }
