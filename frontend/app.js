@@ -1182,6 +1182,7 @@ function actualizarFormulariosConConfigAdmin() {
       const val = typeof m === 'string' ? m : (m.nombre || m.val || m);
       html += `<option value="${val}">${val}</option>`;
     });
+    html += '<option value="__NEW__">➕ Añadir Nuevo Modelo...</option>';
     recModeloSelect.innerHTML = html;
     if (currentVal) recModeloSelect.value = currentVal;
   }
