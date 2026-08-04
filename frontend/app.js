@@ -862,10 +862,25 @@ function obtenerPrefijosSerialesConfigurados() {
 
 function extraerSerialLimpio(raw) {
   if (!raw) return '';
-  const txt = raw.trim();
-  const prefijos = obtenerPrefijosSerialesConfigurados();
+  let txt = raw.trim().toUpperCase();
 
-  // 1. Intentar hacer match con cualquier prefijo de marca configurado (ej: VSOL, HWTC, ZTEG, etc.)
+  // 1. Detección y conversión automática de seriales GPON Hexadecimales de Fabricantes (Huawei, ZTE, Fiberhome, VSOL)
+  // Ejemplo Huawei: 485754436C083EA7 -> 48575443 en HEX es ASCII 'HWTC' -> Retorna 'HWTC6C083EA7'
+  if (/^48575443[A-F0-9]{6,20}$/i.test(txt)) {
+    return 'HWTC' + txt.substring(8);
+  }
+  if (/^5A544547[A-F0-9]{6,20}$/i.test(txt)) {
+    return 'ZTEG' + txt.substring(8);
+  }
+  if (/^46485454[A-F0-9]{6,20}$/i.test(txt)) {
+    return 'FHTT' + txt.substring(8);
+  }
+  if (/^56534F4C[A-F0-9]{6,20}$/i.test(txt)) {
+    return 'VSOL' + txt.substring(8);
+  }
+
+  // 2. Intentar hacer match con cualquier prefijo de marca configurado (ej: VSOL, HWTC, ZTEG, FHTT, TPLK, etc.)
+  const prefijos = obtenerPrefijosSerialesConfigurados();
   const escapedPref = prefijos.map(p => p.trim().toUpperCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).filter(Boolean);
   if (escapedPref.length > 0) {
     const regexPrefijos = new RegExp(`(${escapedPref.join('|')})[A-Z0-9]{4,28}`, 'i');
@@ -875,13 +890,16 @@ function extraerSerialLimpio(raw) {
     }
   }
 
-  // 2. Si no coincide con un prefijo conocido, limpiar prefijos estándar de etiqueta (SN:, MAC:, S/N:)
+  // 3. Limpiar prefijos de etiqueta estándar (SN:, MAC:, S/N:, GPON:)
   let cleaned = txt
-    .replace(/^(SN|S\/N|PON\s*S\/N|PON|MAC|GPON|FSN|DEV):\s*/i, '')
+    .replace(/^(SN|S\/N|PON\s*S\/N|PON|MAC|GPON|GPON\s*SN|FSN|DEV):\s*/i, '')
     .replace(/[\r\n\t\s]/g, '')
     .toUpperCase();
 
   if (/^[A-Z0-9\-\_]{6,32}$/.test(cleaned)) {
+    if (cleaned.startsWith('48575443')) {
+      return 'HWTC' + cleaned.substring(8);
+    }
     return cleaned;
   }
 
@@ -1013,7 +1031,7 @@ function stopNativeScanner(reader) {
 async function startNativeScanner(reader) {
   try {
     const detector = new BarcodeDetector({
-      formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code']
+      formats: ['code_128', 'code_39', 'code_93', 'data_matrix', 'ean_13', 'ean_8', 'qr_code']
     });
 
     reader.innerHTML = '';
@@ -1026,7 +1044,7 @@ async function startNativeScanner(reader) {
     overlay.style.cssText = 'position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:280px; height:100px; border:2px solid #00ff88; border-radius:8px; pointer-events:none; z-index:10; box-shadow: 0 0 0 2000px rgba(0,0,0,0.3);';
     
     const label = document.createElement('div');
-    label.textContent = '📷 Enfoca el código PON S/N (VSOL)';
+    label.textContent = '📷 Enfoca el código de barras del router';
     label.style.cssText = 'position:absolute; bottom:8px; left:50%; transform:translateX(-50%); color:#00ff88; font-size:0.7rem; font-weight:700; white-space:nowrap; z-index:11; text-shadow: 0 1px 3px rgba(0,0,0,0.8);';
 
     reader.style.position = 'relative';
@@ -1044,7 +1062,7 @@ async function startNativeScanner(reader) {
     video.srcObject = nativeScannerStream;
     await video.play();
 
-    setScanStatus('📷 Escáner activo - Enfoca la barra PON S/N (VSOL...)');
+    setScanStatus('📷 Escáner activo - Apunta al código de barras');
 
     let lastDetected = '';
     let lastDetectedTime = 0;
@@ -1054,7 +1072,7 @@ async function startNativeScanner(reader) {
         const barcodes = await detector.detect(video);
         for (const bc of barcodes) {
           const value = bc.rawValue;
-          if (!value || !/(VSOL)/i.test(value)) continue;
+          if (!value) continue;
           const now = Date.now();
           if (value !== lastDetected || (now - lastDetectedTime) > 3000) {
             lastDetected = value;
