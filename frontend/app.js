@@ -556,30 +556,26 @@ function processBarcodeResult(decodedText) {
   
   let raw = decodedText.trim();
   
-  // Extraer el serial VSOL directamente si está presente en el texto decodificado
+  // Extraer SOLO el serial VSOL del texto decodificado
   const vsolMatch = raw.match(/(VSOL[A-Z0-9]{4,24})/i);
-  if (vsolMatch && vsolMatch[1]) {
-    raw = vsolMatch[1].toUpperCase();
-  } else {
-    raw = raw
-      .replace(/^(SN|S\/N|PON\s*S\/N|PON|MAC|GPON|FSN|DEV):\s*/i, '')
-      .replace(/[\r\n\t\s]/g, '')
-      .toUpperCase();
+  if (!vsolMatch || !vsolMatch[1]) {
+    // No es un código VSOL, ignorar silenciosamente (es MAC, PN, S/N genérico, etc.)
+    return;
   }
+  
+  const serial = vsolMatch[1].toUpperCase();
 
-  if (/^[A-Z0-9\-\_]{4,32}$/.test(raw)) {
-    const serial = raw;
-    if (!scanned.includes(serial)) {
-      scanned.push(serial);
-      playBeep();
-      const listEl = document.getElementById('scannedList');
-      const modelo = getModeloActivo();
-      const newLine = `${serial},${modelo}`;
-      listEl.value = listEl.value.trim() ? listEl.value.trim() + '\n' + newLine : newLine;
-      actualizarConteoLista();
-      setScanStatus('✅ Agregado: ' + serial + ' (' + modelo + ')');
-      toast('✅ Serial detectado: ' + serial);
-    }
+  if (!scanned.includes(serial)) {
+    scanned.push(serial);
+    playBeep();
+    const listEl = document.getElementById('scannedList');
+    // Solo guardar el serial, el modelo se toma del dropdown al enviar
+    listEl.value = listEl.value.trim() ? listEl.value.trim() + '\n' + serial : serial;
+    actualizarConteoLista();
+    setScanStatus('✅ Agregado: ' + serial);
+    toast('✅ Serial detectado: ' + serial);
+  } else {
+    setScanStatus('⚠️ Ya escaneado: ' + serial);
   }
 }
 
@@ -593,16 +589,17 @@ function handleFastInput(e) {
 function agregarSerialManual() {
   const input = document.getElementById('fastSerialInput');
   if (!input) return;
-  let val = input.value.trim();
+  let val = input.value.trim().toUpperCase();
   
+  // Intentar extraer VSOL
   const vsolMatch = val.match(/(VSOL[A-Z0-9]{4,24})/i);
   if (vsolMatch && vsolMatch[1]) {
-    val = vsolMatch[1].toUpperCase();
+    val = vsolMatch[1];
   } else {
+    // Si no es VSOL, limpiar prefijos comunes y aceptar como serial genérico
     val = val
       .replace(/^(SN|S\/N|PON\s*S\/N|PON|MAC|GPON|FSN|DEV):\s*/i, '')
-      .replace(/[\r\n\t\s]/g, '')
-      .toUpperCase();
+      .replace(/[\r\n\t\s]/g, '');
   }
     
   if (!val) return;
@@ -611,11 +608,10 @@ function agregarSerialManual() {
     scanned.push(val);
     playBeep();
     const listEl = document.getElementById('scannedList');
-    const modelo = getModeloActivo();
-    const newLine = `${val},${modelo}`;
-    listEl.value = listEl.value.trim() ? listEl.value.trim() + '\n' + newLine : newLine;
+    // Solo guardar el serial, sin modelo
+    listEl.value = listEl.value.trim() ? listEl.value.trim() + '\n' + val : val;
     actualizarConteoLista();
-    toast(`⚡ Agregado: ${val} (${modelo})`);
+    toast(`⚡ Agregado: ${val}`);
   } else {
     toast('⚠️ Serial ya está en la lista', 'error');
   }
@@ -630,7 +626,7 @@ function actualizarConteoLista() {
     scanned = [];
     return;
   }
-  const lines = raw.split('\n').map(l => l.split(',')[0].trim()).filter(Boolean);
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   scanned = [...new Set(lines)];
   document.getElementById('scanCount').textContent = scanned.length;
 }
@@ -695,7 +691,7 @@ async function startNativeScanner(reader) {
     overlay.style.cssText = 'position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:280px; height:100px; border:2px solid #00ff88; border-radius:8px; pointer-events:none; z-index:10; box-shadow: 0 0 0 2000px rgba(0,0,0,0.3);';
     
     const label = document.createElement('div');
-    label.textContent = '📷 Centra el código de barras aquí';
+    label.textContent = '📷 Enfoca el código de barras PON S/N (VSOL)';
     label.style.cssText = 'position:absolute; bottom:8px; left:50%; transform:translateX(-50%); color:#00ff88; font-size:0.7rem; font-weight:700; white-space:nowrap; z-index:11; text-shadow: 0 1px 3px rgba(0,0,0,0.8);';
 
     reader.style.position = 'relative';
@@ -714,7 +710,7 @@ async function startNativeScanner(reader) {
     video.srcObject = nativeScannerStream;
     await video.play();
 
-    setScanStatus('📷 Escáner NATIVO activo - Enfoca el código de barras');
+    setScanStatus('📷 Escáner activo - Enfoca la barra PON S/N (VSOL...)');
 
     // Escanear cada 300ms
     let lastDetected = '';
@@ -723,14 +719,14 @@ async function startNativeScanner(reader) {
       try {
         if (video.readyState < video.HAVE_ENOUGH_DATA) return;
         const barcodes = await detector.detect(video);
-        if (barcodes.length > 0) {
+        for (const bc of barcodes) {
+          const value = bc.rawValue;
+          // Solo procesar si contiene VSOL
+          if (!value || !/(VSOL)/i.test(value)) continue;
           const now = Date.now();
-          const value = barcodes[0].rawValue;
-          // Evitar duplicados rápidos del mismo código
           if (value !== lastDetected || (now - lastDetectedTime) > 3000) {
             lastDetected = value;
             lastDetectedTime = now;
-            console.log('✅ NATIVO DETECTADO:', value, barcodes[0].format);
             processBarcodeResult(value);
           }
         }
@@ -742,7 +738,6 @@ async function startNativeScanner(reader) {
   } catch (err) {
     console.error('Error escáner nativo:', err);
     setScanStatus('⚠️ Escáner nativo falló, intentando alternativo...');
-    // Fallback
     startHtml5Scanner(reader);
   }
 }
@@ -778,7 +773,7 @@ function startHtml5Scanner(reader) {
       (decodedText) => { processBarcodeResult(decodedText); },
       () => {}
     ).then(() => {
-      setScanStatus('📷 Cámara activa - Enfoca el código de barras');
+      setScanStatus('📷 Cámara activa - Enfoca la barra PON S/N (VSOL...)');
     }).catch(err => {
       setScanStatus('❌ Error: ' + (err.message || err), true);
       html5QrCode = null;
@@ -794,11 +789,13 @@ async function enviarRecepcion() {
   const raw = document.getElementById('scannedList').value.trim();
   if (!raw) return toast('Ingresa o escanea al menos un serial', 'error');
   
+  // El modelo se toma del dropdown, NO de cada línea
+  const modelo = getModeloActivo();
+  if (!modelo) return toast('Selecciona un modelo de equipo', 'error');
+  
   const equipos = raw.split('\n').map(line => {
-    const parts = line.split(',');
-    const serial = parts[0] ? parts[0].trim().toUpperCase() : '';
-    const modelo = parts[1] ? parts[1].trim().toUpperCase() : 'AX30-H';
-    return { serial_pon: serial, modelo: modelo || 'AX30-H' };
+    const serial = line.trim().toUpperCase();
+    return { serial_pon: serial, modelo: modelo };
   }).filter(e => e.serial_pon);
 
   if (!equipos.length) return toast('Sin seriales válidos', 'error');
