@@ -171,6 +171,7 @@ function showView(id) {
 
   if (id === 'dashboard') cargarEstadisticasDashboard();
   if (id === 'inventario') cargarInventario();
+  if (id === 'recepcion') initCanvasSignatures();
   if (id === 'instalaciones') cargarPendientes();
   if (id === 'ventas') cargarVentas();
   if (id === 'evaluacion') cargarEquiposEvaluacion();
@@ -537,20 +538,320 @@ function getModeloActivo() {
     return input && input.value.trim() ? input.value.trim().toUpperCase() : 'NUEVO_MODELO';
   }
   return sel.value;
+// ================= WIZARD DE RECEPCIÓN (2 PASOS) =================
+let loteConfig = {
+  proveedor: '',
+  chofer: '',
+  fecha: '',
+  modelos: [], // [ { modelo: 'AX30-H', esperados: 15, escaneados: [] }, ... ]
+  firmaEntrega: '',
+  firmaRecibe: ''
+};
+
+// --- INICIALIZACIÓN DE FIRMAS EN CANVAS ---
+let canvasSignaturesInitialized = false;
+
+function initCanvasSignatures() {
+  if (canvasSignaturesInitialized) return;
+  canvasSignaturesInitialized = true;
+
+  // Fecha por defecto hoy
+  const fechaEl = document.getElementById('recFecha');
+  if (fechaEl && !fechaEl.value) {
+    fechaEl.value = new Date().toISOString().split('T')[0];
+  }
+
+  ['Entrega', 'Recibe'].forEach(tipo => {
+    const canvas = document.getElementById(`canvasFirma${tipo}`);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#1e40af'; // Azul para firma
+
+    let drawing = false;
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches && e.touches[0] ? e.touches[0].clientY : e.clientY;
+      return {
+        x: (clientX - rect.left) * (canvas.width / rect.width),
+        y: (clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+
+    function startDraw(e) {
+      drawing = true;
+      const pos = getPos(e);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+    }
+
+    function draw(e) {
+      if (!drawing) return;
+      if (e.cancelable) e.preventDefault();
+      const pos = getPos(e);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+    }
+
+    function stopDraw() {
+      drawing = false;
+    }
+
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDraw);
+    canvas.addEventListener('mouseleave', stopDraw);
+
+    canvas.addEventListener('touchstart', startDraw, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    canvas.addEventListener('touchend', stopDraw);
+  });
 }
 
-function handleModeloChange(selectEl) {
-  const box = document.getElementById('boxNuevoModelo');
+function limpiarFirma(tipo) {
+  const canvas = document.getElementById(`canvasFirma${tipo}`);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function canvasEstaVacio(canvas) {
+  const ctx = canvas.getContext('2d');
+  const pixelBuffer = new Uint32Array(
+    ctx.getImageData(0, 0, canvas.width, canvas.height).data.buffer
+  );
+  return !pixelBuffer.some(color => color !== 0);
+}
+
+// --- CONFIGURACIÓN PASO 1 ---
+function handleModeloConfigChange(selectEl) {
+  const box = document.getElementById('boxNuevoModeloConfig');
   if (!box) return;
   if (selectEl.value === '__NEW__') {
     box.style.display = 'block';
-    const input = document.getElementById('recNuevoModeloInput');
+    const input = document.getElementById('recNuevoModeloConfigInput');
     if (input) input.focus();
   } else {
     box.style.display = 'none';
   }
 }
 
+function agregarModeloLote() {
+  const selectEl = document.getElementById('recModeloConfigSelect');
+  let modelo = selectEl.value;
+  if (modelo === '__NEW__') {
+    const input = document.getElementById('recNuevoModeloConfigInput');
+    modelo = input ? input.value.trim().toUpperCase() : '';
+  }
+
+  if (!modelo) return toast('Ingresa o selecciona un modelo válido', 'error');
+
+  const cantInput = document.getElementById('recCantEsperadaInput');
+  const esperados = parseInt(cantInput ? cantInput.value : '0', 10);
+
+  if (!esperados || esperados < 1) return toast('Ingresa una cantidad esperada mayor a 0', 'error');
+
+  // Verificar si ya existe en la lista
+  const existente = loteConfig.modelos.find(m => m.modelo === modelo);
+  if (existente) {
+    existente.esperados += esperados;
+  } else {
+    loteConfig.modelos.push({
+      modelo: modelo,
+      esperados: esperados,
+      escaneados: []
+    });
+  }
+
+  if (cantInput) cantInput.value = '';
+  renderTablaModelosLote();
+  toast(`✅ Modelo ${modelo} (${esperados} unid.) añadido al lote`);
+}
+
+function eliminarModeloLote(index) {
+  if (index >= 0 && index < loteConfig.modelos.length) {
+    loteConfig.modelos.splice(index, 1);
+    renderTablaModelosLote();
+  }
+}
+
+function renderTablaModelosLote() {
+  const tbody = document.getElementById('tbodyModelosLote');
+  if (!tbody) return;
+
+  if (!loteConfig.modelos.length) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--muted)">No se han añadido modelos a este lote.</td></tr>';
+    return;
+  }
+
+  let html = '';
+  loteConfig.modelos.forEach((m, idx) => {
+    html += `
+      <tr>
+        <td style="font-weight:700; color:var(--accent)">${m.modelo}</td>
+        <td style="color:#60a5fa; font-weight:600">${m.esperados} unidades</td>
+        <td>
+          <button type="button" class="btn danger" style="padding:.2rem .5rem; font-size:.8rem" onclick="eliminarModeloLote(${idx})">🗑️</button>
+        </td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+// --- NAVEGACIÓN PASO 1 ➔ PASO 2 ---
+function irAPaso2Escaneo() {
+  const provEl = document.getElementById('recProveedor');
+  const choferEl = document.getElementById('recChofer');
+  const fechaEl = document.getElementById('recFecha');
+
+  const proveedor = provEl ? provEl.value.trim() : '';
+  const chofer = choferEl ? choferEl.value.trim() : '';
+  const fecha = fechaEl ? fechaEl.value : '';
+
+  if (!proveedor) return toast('Ingresa el Proveedor u Origen del lote', 'error');
+  if (!chofer) return toast('Ingresa el Chofer o Despachador', 'error');
+  if (!loteConfig.modelos.length) return toast('Añade al menos un modelo con su cantidad esperada', 'error');
+
+  const canvasEntrega = document.getElementById('canvasFirmaEntrega');
+  const canvasRecibe = document.getElementById('canvasFirmaRecibe');
+
+  if (canvasEntrega && canvasEstaVacio(canvasEntrega)) {
+    return toast('La firma de quien entrega es obligatoria', 'error');
+  }
+  if (canvasRecibe && canvasEstaVacio(canvasRecibe)) {
+    return toast('La firma de quien recibe es obligatoria', 'error');
+  }
+
+  loteConfig.proveedor = proveedor;
+  loteConfig.chofer = chofer;
+  loteConfig.fecha = fecha;
+  loteConfig.firmaEntrega = canvasEntrega ? canvasEntrega.toDataURL() : '';
+  loteConfig.firmaRecibe = canvasRecibe ? canvasRecibe.toDataURL() : '';
+
+  // Actualizar banner Paso 2
+  const lblOrigen = document.getElementById('lblOrigenInfo');
+  const lblChofer = document.getElementById('lblChoferInfo');
+  if (lblOrigen) lblOrigen.textContent = proveedor;
+  if (lblChofer) lblChofer.textContent = chofer;
+
+  // Poblar dropdown de escaneo en Paso 2
+  poblarSelectEscaneoPaso2();
+  renderProgresoModelos();
+  renderListaSerialesScanned();
+
+  // Cambiar vista
+  document.getElementById('recepcionStep1').style.display = 'none';
+  document.getElementById('recepcionStep2').style.display = 'block';
+
+  toast('🟢 Paso 2 listo: Inicia el escaneo de seriales');
+}
+
+function volverAPaso1() {
+  const reader = document.getElementById('reader');
+  if (reader && reader.style.display === 'block') {
+    stopNativeScanner(reader);
+  }
+  document.getElementById('recepcionStep2').style.display = 'none';
+  document.getElementById('recepcionStep1').style.display = 'block';
+}
+
+function poblarSelectEscaneoPaso2() {
+  const select = document.getElementById('recModeloScanSelect');
+  if (!select) return;
+
+  let html = '';
+  loteConfig.modelos.forEach(m => {
+    const esc = m.escaneados.length;
+    const est = m.esperados;
+    const badge = esc >= est ? ' (COMPLETADO)' : '';
+    html += `<option value="${m.modelo}">${m.modelo}${badge}</option>`;
+  });
+  select.innerHTML = html;
+}
+
+function getModeloActivoScan() {
+  const select = document.getElementById('recModeloScanSelect');
+  return select ? select.value : (loteConfig.modelos[0] ? loteConfig.modelos[0].modelo : '');
+}
+
+function onModeloScanSelectChange() {
+  // Enfocar input de serial
+  const input = document.getElementById('fastSerialInput');
+  if (input) input.focus();
+}
+
+// --- RENDERIZADO DE PASO 2 ---
+function renderProgresoModelos() {
+  const grid = document.getElementById('gridProgresoModelos');
+  if (!grid) return;
+
+  let html = '';
+  loteConfig.modelos.forEach(m => {
+    const esc = m.escaneados.length;
+    const est = m.esperados;
+    const esCompleto = esc >= est;
+    const borderColor = esCompleto ? '#22c55e' : '#f97316';
+    const bgColor = esCompleto ? 'rgba(34,197,94,0.1)' : 'rgba(249,115,22,0.1)';
+    const statusText = esCompleto ? '✅ COMPLETADO' : `${esc} / ${est} Escaneados`;
+
+    html += `
+      <div style="border:2px solid ${borderColor}; background:${bgColor}; border-radius:.5rem; padding:1rem; transition:all .3s">
+        <div style="font-size:.85rem; color:var(--muted); font-weight:600">${m.modelo}</div>
+        <div style="font-size:1.4rem; font-weight:800; color:${borderColor}; margin-top:.2rem">${statusText}</div>
+      </div>
+    `;
+  });
+  grid.innerHTML = html;
+}
+
+function renderListaSerialesScanned() {
+  const container = document.getElementById('contenedorListaSeriales');
+  const countEl = document.getElementById('scanCount');
+  if (!container) return;
+
+  let totalEscaneados = 0;
+  let itemsHtml = '';
+
+  loteConfig.modelos.forEach(m => {
+    m.escaneados.forEach(serial => {
+      totalEscaneados++;
+      itemsHtml += `
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:.3rem; padding:.5rem .8rem; margin-bottom:.4rem">
+          <div>
+            <span style="font-family:monospace; font-weight:700; font-size:1rem; color:var(--accent)">${serial}</span>
+            <span class="badge" style="margin-left:.5rem; background:#334155; color:#cbd5e1">${m.modelo}</span>
+          </div>
+          <button type="button" class="btn danger" style="padding:.15rem .4rem; font-size:.75rem; width:auto" onclick="eliminarSerialEscaneado('${m.modelo}', '${serial}')">🗑️</button>
+        </div>
+      `;
+    });
+  });
+
+  if (countEl) countEl.textContent = totalEscaneados;
+
+  if (!totalEscaneados) {
+    container.innerHTML = '<div style="color:var(--muted); text-align:center; padding:1.5rem">Ningún serial escaneado.</div>';
+  } else {
+    container.innerHTML = itemsHtml;
+  }
+}
+
+function eliminarSerialEscaneado(modelo, serial) {
+  const mObj = loteConfig.modelos.find(m => m.modelo === modelo);
+  if (mObj) {
+    mObj.escaneados = mObj.escaneados.filter(s => s !== serial);
+    poblarSelectEscaneoPaso2();
+    renderProgresoModelos();
+    renderListaSerialesScanned();
+    toast(`Serial ${serial} eliminado del lote`);
+  }
+}
+
+// --- RECEPCIÓN Y ESCANEO DE SERIALES ---
 function processBarcodeResult(decodedText) {
   if (!decodedText) return;
   
@@ -559,24 +860,11 @@ function processBarcodeResult(decodedText) {
   // Extraer SOLO el serial VSOL del texto decodificado
   const vsolMatch = raw.match(/(VSOL[A-Z0-9]{4,24})/i);
   if (!vsolMatch || !vsolMatch[1]) {
-    // No es un código VSOL, ignorar silenciosamente (es MAC, PN, S/N genérico, etc.)
     return;
   }
   
   const serial = vsolMatch[1].toUpperCase();
-
-  if (!scanned.includes(serial)) {
-    scanned.push(serial);
-    playBeep();
-    const listEl = document.getElementById('scannedList');
-    // Solo guardar el serial, el modelo se toma del dropdown al enviar
-    listEl.value = listEl.value.trim() ? listEl.value.trim() + '\n' + serial : serial;
-    actualizarConteoLista();
-    setScanStatus('✅ Agregado: ' + serial);
-    toast('✅ Serial detectado: ' + serial);
-  } else {
-    setScanStatus('⚠️ Ya escaneado: ' + serial);
-  }
+  procesarIngresoSerial(serial);
 }
 
 function handleFastInput(e) {
@@ -591,12 +879,10 @@ function agregarSerialManual() {
   if (!input) return;
   let val = input.value.trim().toUpperCase();
   
-  // Intentar extraer VSOL
   const vsolMatch = val.match(/(VSOL[A-Z0-9]{4,24})/i);
   if (vsolMatch && vsolMatch[1]) {
     val = vsolMatch[1];
   } else {
-    // Si no es VSOL, limpiar prefijos comunes y aceptar como serial genérico
     val = val
       .replace(/^(SN|S\/N|PON\s*S\/N|PON|MAC|GPON|FSN|DEV):\s*/i, '')
       .replace(/[\r\n\t\s]/g, '');
@@ -604,34 +890,68 @@ function agregarSerialManual() {
     
   if (!val) return;
 
-  if (!scanned.includes(val)) {
-    scanned.push(val);
-    playBeep();
-    const listEl = document.getElementById('scannedList');
-    // Solo guardar el serial, sin modelo
-    listEl.value = listEl.value.trim() ? listEl.value.trim() + '\n' + val : val;
-    actualizarConteoLista();
-    toast(`⚡ Agregado: ${val}`);
-  } else {
-    toast('⚠️ Serial ya está en la lista', 'error');
+  const exito = procesarIngresoSerial(val);
+  if (exito) {
+    input.value = '';
+    input.focus();
   }
-  input.value = '';
-  input.focus();
 }
 
-function actualizarConteoLista() {
-  const raw = document.getElementById('scannedList').value.trim();
-  if (!raw) {
-    document.getElementById('scanCount').textContent = '0';
-    scanned = [];
-    return;
+function procesarIngresoSerial(serial) {
+  // Buscar si ya está escaneado en cualquier modelo
+  for (const m of loteConfig.modelos) {
+    if (m.escaneados.includes(serial)) {
+      setScanStatus(`⚠️ Serial ${serial} ya está escaneado en este lote`, true);
+      toast(`⚠️ Serial ${serial} ya está registrado en este lote`, 'error');
+      return false;
+    }
   }
-  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
-  scanned = [...new Set(lines)];
-  document.getElementById('scanCount').textContent = scanned.length;
+
+  const modeloActivo = getModeloActivoScan();
+  const mObj = loteConfig.modelos.find(m => m.modelo === modeloActivo);
+
+  if (!mObj) {
+    toast('Selecciona un modelo válido', 'error');
+    return false;
+  }
+
+  if (mObj.escaneados.length >= mObj.esperados) {
+    toast(`⚠️ El modelo ${mObj.modelo} ya alcanzó el límite esperado (${mObj.esperados}/${mObj.esperados})`, 'warning');
+    setScanStatus(`⚠️ Límite alcanzado para ${mObj.modelo}`, true);
+
+    // Intentar cambiar automáticamente al siguiente modelo incompleto
+    const siguienteIncompleto = loteConfig.modelos.find(m => m.escaneados.length < m.esperados);
+    if (siguienteIncompleto) {
+      const select = document.getElementById('recModeloScanSelect');
+      if (select) select.value = siguienteIncompleto.modelo;
+      toast(`👉 Cambiado automáticamente a ${siguienteIncompleto.modelo}`, 'info');
+    }
+    return false;
+  }
+
+  mObj.escaneados.push(serial);
+  playBeep();
+  setScanStatus(`✅ Agregado: ${serial} (${mObj.modelo})`);
+  toast(`✅ Serial agregado: ${serial} (${mObj.modelo})`);
+
+  poblarSelectEscaneoPaso2();
+  renderProgresoModelos();
+  renderListaSerialesScanned();
+
+  // Si con este serial se completó el modelo, avisar
+  if (mObj.escaneados.length === mObj.esperados) {
+    toast(`🎉 ¡Modelo ${mObj.modelo} completado al 100%!`, 'success');
+    const siguiente = loteConfig.modelos.find(m => m.escaneados.length < m.esperados);
+    if (siguiente) {
+      const select = document.getElementById('recModeloScanSelect');
+      if (select) select.value = siguiente.modelo;
+    }
+  }
+
+  return true;
 }
 
-// ================= CÁMARA Y ESCÁNER NATIVO =================
+// --- CÁMARA ESCÁNER NATIVO Y FALLBACK ---
 let nativeScannerStream = null;
 let nativeScannerInterval = null;
 
@@ -639,7 +959,6 @@ function toggleScanner() {
   const reader = document.getElementById('reader');
   if (!reader) return;
   
-  // Si ya está activo, cerrar
   if (reader.style.display === 'block') {
     stopNativeScanner(reader);
     return;
@@ -648,11 +967,9 @@ function toggleScanner() {
   reader.style.display = 'block';
   setScanStatus('Solicitando acceso a la cámara...');
 
-  // Intentar API nativa BarcodeDetector (Chrome Android 83+)
   if ('BarcodeDetector' in window) {
     startNativeScanner(reader);
   } else {
-    // Fallback a html5-qrcode
     startHtml5Scanner(reader);
   }
 }
@@ -680,7 +997,6 @@ async function startNativeScanner(reader) {
       formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code']
     });
 
-    // Crear video element
     reader.innerHTML = '';
     const video = document.createElement('video');
     video.setAttribute('playsinline', '');
@@ -691,7 +1007,7 @@ async function startNativeScanner(reader) {
     overlay.style.cssText = 'position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:280px; height:100px; border:2px solid #00ff88; border-radius:8px; pointer-events:none; z-index:10; box-shadow: 0 0 0 2000px rgba(0,0,0,0.3);';
     
     const label = document.createElement('div');
-    label.textContent = '📷 Enfoca el código de barras PON S/N (VSOL)';
+    label.textContent = '📷 Enfoca el código PON S/N (VSOL)';
     label.style.cssText = 'position:absolute; bottom:8px; left:50%; transform:translateX(-50%); color:#00ff88; font-size:0.7rem; font-weight:700; white-space:nowrap; z-index:11; text-shadow: 0 1px 3px rgba(0,0,0,0.8);';
 
     reader.style.position = 'relative';
@@ -699,7 +1015,6 @@ async function startNativeScanner(reader) {
     reader.appendChild(overlay);
     reader.appendChild(label);
 
-    // Solicitar cámara HD
     nativeScannerStream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: 'environment',
@@ -712,7 +1027,6 @@ async function startNativeScanner(reader) {
 
     setScanStatus('📷 Escáner activo - Enfoca la barra PON S/N (VSOL...)');
 
-    // Escanear cada 300ms
     let lastDetected = '';
     let lastDetectedTime = 0;
     nativeScannerInterval = setInterval(async () => {
@@ -721,7 +1035,6 @@ async function startNativeScanner(reader) {
         const barcodes = await detector.detect(video);
         for (const bc of barcodes) {
           const value = bc.rawValue;
-          // Solo procesar si contiene VSOL
           if (!value || !/(VSOL)/i.test(value)) continue;
           const now = Date.now();
           if (value !== lastDetected || (now - lastDetectedTime) > 3000) {
@@ -784,38 +1097,83 @@ function startHtml5Scanner(reader) {
   }
 }
 
-// ================= RECEPCIÓN =================
-async function enviarRecepcion() {
-  const raw = document.getElementById('scannedList').value.trim();
-  if (!raw) return toast('Ingresa o escanea al menos un serial', 'error');
-  
-  // El modelo se toma del dropdown, NO de cada línea
-  const modelo = getModeloActivo();
-  if (!modelo) return toast('Selecciona un modelo de equipo', 'error');
-  
-  const equipos = raw.split('\n').map(line => {
-    const serial = line.trim().toUpperCase();
-    return { serial_pon: serial, modelo: modelo };
-  }).filter(e => e.serial_pon);
+// --- GUARDAR LOTE COMPLETO EN INVENTARIO ---
+async function enviarRecepcionLoteCompleto() {
+  // Aplanar todos los seriales escaneados por modelo
+  const equipos = [];
+  let totalEscaneados = 0;
+  let totalEsperados = 0;
+  let modelosIncompletos = [];
 
-  if (!equipos.length) return toast('Sin seriales válidos', 'error');
+  loteConfig.modelos.forEach(m => {
+    totalEsperados += m.esperados;
+    totalEscaneados += m.escaneados.length;
+    if (m.escaneados.length < m.esperados) {
+      modelosIncompletos.push(`${m.modelo} (${m.escaneados.length}/${m.esperados})`);
+    }
+    m.escaneados.forEach(serial => {
+      equipos.push({
+        serial_pon: serial,
+        modelo: m.modelo
+      });
+    });
+  });
+
+  if (!equipos.length) {
+    return toast('Debes escanear al menos un serial para guardar la recepción', 'error');
+  }
+
+  if (modelosIncompletos.length > 0) {
+    const confirmar = confirm(
+      `⚠️ Hay modelos incompletos en el lote:\n- ${modelosIncompletos.join('\n- ')}\n\n¿Deseas guardar de todos modos con los equipos escaneados hasta ahora?`
+    );
+    if (!confirmar) return;
+  }
 
   try {
-    toast('Guardando recepción...', 'info');
-    const data = await apiPost('/equipos/recepcion', {
-      equipos,
-      entrega: document.getElementById('recEntrega').value.trim(),
-      recibe: document.getElementById('recRecibe').value.trim(),
-      observaciones: document.getElementById('recObs').value.trim()
-    });
-    toast(`✅ Recepción ${data.id || ''} guardada (${data.cantidad || equipos.length} equipos)`);
-    scanned = [];
-    document.getElementById('scannedList').value = '';
-    actualizarConteoLista();
+    toast('💾 Guardando recepción e ingresando a inventario...', 'info');
+
+    const payload = {
+      equipos: equipos,
+      entrega: loteConfig.chofer,
+      recibe: loteConfig.proveedor,
+      firma_entrega: loteConfig.firmaEntrega,
+      firma_recibe: loteConfig.firmaRecibe,
+      observaciones: `Lote de recepción (${loteConfig.proveedor} / Chofer: ${loteConfig.chofer})`
+    };
+
+    const data = await apiPost('/equipos/recepcion', payload);
+
+    toast(`✅ Recepción ${data.id || ''} completada exitosamente. ${equipos.length} equipos agregados al inventario.`, 'success');
+
+    // Resetear formulario
+    loteConfig = {
+      proveedor: '',
+      chofer: '',
+      fecha: new Date().toISOString().split('T')[0],
+      modelos: [],
+      firmaEntrega: '',
+      firmaRecibe: ''
+    };
+
+    limpiarFirma('Entrega');
+    limpiarFirma('Recibe');
+
+    const provEl = document.getElementById('recProveedor');
+    const choferEl = document.getElementById('recChofer');
+    if (provEl) provEl.value = '';
+    if (choferEl) choferEl.value = '';
+
+    renderTablaModelosLote();
+    volverAPaso1();
+
+    // Recargar inventario y dashboard
     cargarInventario();
     cargarEstadisticasDashboard();
+
   } catch (e) {
-    toast('Error guardando recepción: ' + (e.message || e), 'error');
+    console.error('Error enviando recepción:', e);
+    toast('Error al guardar recepción: ' + (e.message || e), 'error');
   }
 }
 
