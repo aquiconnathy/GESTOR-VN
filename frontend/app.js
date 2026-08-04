@@ -657,19 +657,9 @@ function toggleScanner() {
   }
 
   try {
-    const config = {
-      fps: 25,
-      qrbox: (viewfinderWidth, viewfinderHeight) => ({
-        width: Math.floor(Math.min(viewfinderWidth * 0.85, 320)),
-        height: Math.floor(Math.min(viewfinderHeight * 0.5, 180))
-      }),
-      experimentalFeatures: {
-        useBarCodeDetectorIfSupported: true
-      }
-    };
-
+    let formats = undefined;
     if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
-      config.formatsToSupport = [
+      formats = [
         Html5QrcodeSupportedFormats.CODE_128,
         Html5QrcodeSupportedFormats.CODE_39,
         Html5QrcodeSupportedFormats.CODE_93,
@@ -680,10 +670,23 @@ function toggleScanner() {
       ];
     }
 
-    html5QrCode = new Html5Qrcode("reader");
+    const constructorOptions = formats ? { formatsToSupport: formats, verbose: false } : { verbose: false };
+    html5QrCode = new Html5Qrcode("reader", constructorOptions);
+
+    const startConfig = {
+      fps: 25,
+      qrbox: (viewfinderWidth, viewfinderHeight) => ({
+        width: Math.floor(Math.min(viewfinderWidth * 0.9, 320)),
+        height: Math.floor(Math.min(viewfinderHeight * 0.45, 140))
+      }),
+      experimentalFeatures: {
+        useBarCodeDetectorIfSupported: true
+      }
+    };
+
     html5QrCode.start(
       { facingMode: "environment" },
-      config,
+      startConfig,
       processBarcodeResult,
       () => {}
     ).then(() => {
